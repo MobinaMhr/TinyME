@@ -12,6 +12,16 @@ public class Matcher {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
         LinkedList<Trade> trades = new LinkedList<>();
 
+        int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
+
+        if (newOrder.getSide() == Side.BUY && lastTradePrice < newOrder.getStopPrice()) {
+            orderBook.DeActive(newOrder);
+            return MatchResult.notMetLastTradePrice();
+        } else if (newOrder.getSide() == Side.SELL && lastTradePrice > newOrder.getStopPrice()) {
+            orderBook.DeActive(newOrder);
+            return MatchResult.notMetLastTradePrice();
+        }
+
         while (orderBook.hasOrderOfType(newOrder.getSide().opposite()) && newOrder.getQuantity() > 0) {
             Order matchingOrder = orderBook.matchWithFirst(newOrder);
             if (matchingOrder == null)
@@ -70,7 +80,7 @@ public class Matcher {
     }
 
     public MatchResult execute(Order order) {
-        int prevQuantity = order.getQuantity(); //TODO:: should be better
+        int prevQuantity = order.getQuantity();
         MatchResult result = match(order);
         if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT)
             return result;
