@@ -44,7 +44,7 @@ public class EnterOrderRq {
         this.minimumExecutionQuantity = minimumExecutionQuantity;
         this.stopPrice = stopPrice;
     }
-    // no MEQ constructor
+
     private EnterOrderRq(OrderEntryType orderEntryType, long requestId, String securityIsin, long orderId, LocalDateTime entryTime, Side side, int quantity, int price, long brokerId, long shareholderId, int peakSize) {
         this(orderEntryType, requestId, securityIsin, orderId, entryTime, side, quantity, price, brokerId, shareholderId, peakSize, 0, 0);
     }

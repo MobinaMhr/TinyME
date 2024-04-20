@@ -15,6 +15,7 @@ public class OrderBook {
     public OrderBook() {
         buyQueue = new LinkedList<>();
         sellQueue = new LinkedList<>();
+        inactiveOrderQueue = new LinkedList<>();
     }
 
     public void DeActive(Order order) {
@@ -91,5 +92,20 @@ public class OrderBook {
                 .filter(order -> order.getShareholder().equals(shareholder))
                 .mapToInt(Order::getTotalQuantity)
                 .sum();
+    }
+    private boolean isCandidateForActiveQueue(Order order, int lastTredePrice){
+        return (order.getSide() == Side.SELL && order.getStopPrice() >= lastTredePrice)
+                || (order.getSide() == Side.BUY && order.getStopPrice() <= lastTredePrice);
+    }
+
+    public void activateCandidateOrders(int lastTradePrice){
+        var it = inactiveOrderQueue.listIterator();
+        while (it.hasNext()) {
+            if (isCandidateForActiveQueue(it.next(),lastTradePrice)){
+                if (it.next().getSide() == Side.BUY)
+                    it.next().decreaseQuantity(it.next().getQuantity());
+                enqueue(it.next());
+            }
+        }
     }
 }

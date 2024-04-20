@@ -38,7 +38,7 @@ public class Security {
                     enterOrderRq.getEntryTime(), enterOrderRq.getPeakSize(), OrderStatus.NEW,
                     enterOrderRq.getMinimumExecutionQuantity());
 
-        return matcher.execute(order);
+//        return matcher.execute(order);
 //        return matcher.execute(order);
 //        some where else in update this is called
         MatchResult result = matcher.execute(order);
