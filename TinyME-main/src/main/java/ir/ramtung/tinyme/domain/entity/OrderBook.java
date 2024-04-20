@@ -10,10 +10,15 @@ import java.util.ListIterator;
 public class OrderBook {
     private final LinkedList<Order> buyQueue;
     private final LinkedList<Order> sellQueue;
+    private final LinkedList<Order> inactiveOrderQueue;
 
     public OrderBook() {
         buyQueue = new LinkedList<>();
         sellQueue = new LinkedList<>();
+    }
+
+    public void DeActive(Order order) {
+        inactiveOrderQueue.add(order);
     }
 
     public void enqueue(Order order) {
