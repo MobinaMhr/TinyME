@@ -24,6 +24,10 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.NOT_MET_MEQ_VALUE, null, new LinkedList<>());
     }
 
+    public static MatchResult notMetLastTradePrice() {
+        return new MatchResult(MatchingOutcome.NOT_MET_LAST_TRADE_PRICE, null, new LinkedList<>());
+    }
+
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
         this.remainder = remainder;
