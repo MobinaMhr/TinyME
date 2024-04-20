@@ -14,12 +14,11 @@ public class Matcher {
 
         int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
 
-        if (newOrder.getSide() == Side.BUY && lastTradePrice < newOrder.getStopPrice()) {
-            orderBook.DeActive(newOrder);
-            return MatchResult.notMetLastTradePrice();
-        } else if (newOrder.getSide() == Side.SELL && lastTradePrice > newOrder.getStopPrice()) {
-            orderBook.DeActive(newOrder);
-            return MatchResult.notMetLastTradePrice();
+        if (newOrder instanceof StopLimitOrder stopLimitOrder) {
+            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
+                orderBook.DeActive(newOrder);
+                return MatchResult.notMetLastTradePrice();
+            }
         }
 
         while (orderBook.hasOrderOfType(newOrder.getSide().opposite()) && newOrder.getQuantity() > 0) {
@@ -75,7 +74,7 @@ public class Matcher {
         }
     }
 
-    private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){//TODO:: naming changed a little
+    private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){
         return (initialQuantity - remainder.getQuantity()) >= remainder.getMinimumExecutionQuantity();
     }
 

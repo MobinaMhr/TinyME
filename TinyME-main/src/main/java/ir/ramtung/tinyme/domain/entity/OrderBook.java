@@ -19,6 +19,7 @@ public class OrderBook {
     }
 
     public void DeActive(Order order) {
+        assert order instanceof StopLimitOrder;
         inactiveOrderQueue.add(order);
     }
 
@@ -51,6 +52,13 @@ public class OrderBook {
     public boolean removeByOrderId(Side side, long orderId) {
         var queue = getQueue(side);
         var it = queue.listIterator();
+        while (it.hasNext()) {
+            if (it.next().getOrderId() == orderId) {
+                it.remove();
+                return true;
+            }
+        }
+        it = inactiveOrderQueue.listIterator();
         while (it.hasNext()) {
             if (it.next().getOrderId() == orderId) {
                 it.remove();
@@ -93,19 +101,22 @@ public class OrderBook {
                 .mapToInt(Order::getTotalQuantity)
                 .sum();
     }
-    private boolean isCandidateForActiveQueue(Order order, int lastTredePrice){
-        return (order.getSide() == Side.SELL && order.getStopPrice() >= lastTredePrice)
-                || (order.getSide() == Side.BUY && order.getStopPrice() <= lastTredePrice);
-    }
 
     public void activateCandidateOrders(int lastTradePrice){
         var it = inactiveOrderQueue.listIterator();
         while (it.hasNext()) {
-            if (isCandidateForActiveQueue(it.next(),lastTradePrice)){
-                if (it.next().getSide() == Side.BUY)
-                    it.next().decreaseQuantity(it.next().getQuantity());
-                enqueue(it.next());
+            if (it.next() instanceof StopLimitOrder stopLimitOrder) {
+                if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice))
+                    enqueue(it.next());
             }
         }
+    }
+
+    public Order findByOrderIdForInactiveQueue(long orderId) {
+        for (Order order : inactiveOrderQueue) {
+            if (order.getOrderId() == orderId)
+                return order;
+        }
+        return null;
     }
 }
