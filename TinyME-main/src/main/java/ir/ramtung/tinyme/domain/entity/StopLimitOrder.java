@@ -58,9 +58,9 @@ public class StopLimitOrder extends Order {
 //        displayedQuantity -= amount;
 //    }
 
-    @Override //TODO:: rideh
+    @Override
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         super.updateFromRequest(updateOrderRq);
-//        peakSize = updateOrderRq.getPeakSize();
+        stopPrice = updateOrderRq.getStopPrice();
     }
 }

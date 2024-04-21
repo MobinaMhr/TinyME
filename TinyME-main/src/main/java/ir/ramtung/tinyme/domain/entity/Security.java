@@ -70,7 +70,16 @@ public class Security {
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
-        Order order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+        Order order = null;
+        if (updateOrderRq.getPrice() > 0) {
+            order = orderBook.findByOrderIdForInactiveQueue(updateOrderRq.getOrderId());
+            if (order == null){
+                throw new InvalidRequestException(Message.STOP_LIMIT_ORDER_ID_NOT_FOUND);
+            }
+        }
+        if (order == null)
+            order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+
 
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);

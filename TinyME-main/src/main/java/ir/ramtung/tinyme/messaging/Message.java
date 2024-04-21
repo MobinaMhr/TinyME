@@ -19,5 +19,6 @@ public class Message {
     public static final String ORDER_NOT_MET_MEQ_VALUE = "Order not met minimum execution quantity value";
     public static final String MEQ_NOT_POSITIVE = "Minimum execution quantity is not-positive";
     public static final String MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY = "Minimum execution quantity cannot be more than order quantity";
+    public static final String STOP_LIMIT_ORDER_ID_NOT_FOUND = "Stop limit order ID not found in the order book";
 
 }
