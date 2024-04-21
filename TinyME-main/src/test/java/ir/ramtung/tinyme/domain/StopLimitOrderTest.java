@@ -76,4 +76,19 @@ public class StopLimitOrderTest {
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
         assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
     }
+
+    @Test
+    void check_if_sell_order_enqueues_to_inActive_queues() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.SELL, 200, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 16000);
+
+        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL,2)).isNotNull();
+    }
 }

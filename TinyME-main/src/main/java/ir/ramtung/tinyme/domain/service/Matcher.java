@@ -88,7 +88,8 @@ public class Matcher {
         if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT)
             return result;
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
-            order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
+            if (order.getSide() == Side.BUY)
+                order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
             return result;
         }
         
