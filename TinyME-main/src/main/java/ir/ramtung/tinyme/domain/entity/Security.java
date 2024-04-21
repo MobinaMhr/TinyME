@@ -61,7 +61,7 @@ public class Security {
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
-        if (updateOrderRq.getPrice() > 0) {
+        if (updateOrderRq.getStopPrice() > 0) {
             order = orderBook.findByOrderIdForInactiveQueue(updateOrderRq.getSide(), updateOrderRq.getOrderId());
             if (order == null){
                 throw new InvalidRequestException(Message.STOP_LIMIT_ORDER_ID_NOT_FOUND);
