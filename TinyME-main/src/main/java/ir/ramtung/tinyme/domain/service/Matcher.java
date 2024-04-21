@@ -15,9 +15,11 @@ public class Matcher {
         int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
 
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
-            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
-                if (stopLimitOrder.getSide() == Side.BUY && stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice()))
-                    return  MatchResult.notEnoughCredit();
+            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
+                if (stopLimitOrder.getSide() == Side.BUY
+                        && !stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice())) {
+                    return MatchResult.notEnoughCredit();
+                }
                 orderBook.DeActive(newOrder);
                 return MatchResult.notMetLastTradePrice();
             }
@@ -85,6 +87,10 @@ public class Matcher {
         MatchResult result = match(order);
         if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT)
             return result;
+        if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
+            order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
+            return result;
+        }
         
         if (order.getStatus() == OrderStatus.NEW){
             if(! isMEQFilterPassedBy(result.remainder(), prevQuantity)){
