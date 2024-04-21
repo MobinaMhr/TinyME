@@ -18,6 +18,9 @@ public class Message {
     public static final String CANNOT_CHANGE_MEQ_DURING_UPDATE = "Cannot change minimum execution quantity during update";
     public static final String ORDER_NOT_MET_MEQ_VALUE = "Order not met minimum execution quantity value";
     public static final String MEQ_NOT_POSITIVE = "Minimum execution quantity is not-positive";
+    public static final String STOP_PRICE_NOT_POSITIVE = "Stop price is not-positive";
+    public static final String ORDER_CANNOT_BE_ICEBERG_AND_STOP_LIMIT = "Order cannot be iceberg and stop limit";
+    public static final String ORDER_CANNOT_HAVE_MEQ_AND_BE_STOP_LIMIT = "Order cannot have minimum execution quantity and be stop limit";
     public static final String MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY = "Minimum execution quantity cannot be more than order quantity";
     public static final String STOP_LIMIT_ORDER_ID_NOT_FOUND = "Stop limit order ID not found in the order book";
 
