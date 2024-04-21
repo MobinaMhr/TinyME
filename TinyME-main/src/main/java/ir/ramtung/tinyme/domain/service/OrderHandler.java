@@ -70,22 +70,27 @@ public class OrderHandler {
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
-            executeActivatedSLO(security.getOrderBook().activateCandidateOrders(security.getLastTradePrice()), enterOrderRq);
+            executeActivatedSLO(security.getLastTradePrice(), enterOrderRq);
 
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
         }
     }
 
-    public void executeActivatedSLO(Order orderUnderActivation, EnterOrderRq enterOrderRq){
-        MatchResult matchResult = matcher.execute(orderUnderActivation);
-        if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
-            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
-            return;
+    public void executeActivatedSLO(EnterOrderRq enterOrderRq, Security security){
+        StopLimitOrder orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
+        while (orderUnderActivation != null){
+            MatchResult matchResult = matcher.execute(orderUnderActivation);
+            if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
+                eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
+                return;
+            }
+            if (!matchResult.trades().isEmpty()) {
+                eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
+            }
+            orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
         }
-        if (!matchResult.trades().isEmpty()) {
-            eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
-        }
+
     }
 
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {

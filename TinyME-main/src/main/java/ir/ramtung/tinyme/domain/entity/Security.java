@@ -43,20 +43,10 @@ public class Security {
                     enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
                     enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
 
-//        return matcher.execute(order);
-//        some where else in update this is called
+
         MatchResult result = matcher.execute(order);
         if (!result.trades().isEmpty())
             lastTradePrice = result.trades().getLast().getPrice();
-        ////////////////////////////////////////////////////////////////////////////
-        Order popedSLOrder = orderBook.activateCandidateOrders(lastTradePrice);
-        if (popedSLOrder == null) {
-            return result;
-        }
-
-        MatchResult result2 = matcher.execute(order);
-
-        // here handle kosshers
         return result;
     }
 
@@ -72,7 +62,7 @@ public class Security {
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
         if (updateOrderRq.getPrice() > 0) {
-            order = orderBook.findByOrderIdForInactiveQueue(updateOrderRq.getOrderId());
+            order = orderBook.findByOrderIdForInactiveQueue(updateOrderRq.getSide(), updateOrderRq.getOrderId());
             if (order == null){
                 throw new InvalidRequestException(Message.STOP_LIMIT_ORDER_ID_NOT_FOUND);
             }

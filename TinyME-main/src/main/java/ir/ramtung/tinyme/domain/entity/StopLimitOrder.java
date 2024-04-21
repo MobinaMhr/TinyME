@@ -63,4 +63,14 @@ public class StopLimitOrder extends Order {
         super.updateFromRequest(updateOrderRq);
         stopPrice = updateOrderRq.getStopPrice();
     }
+
+    @Override
+    public boolean queuesBefore(Order order) {
+        StopLimitOrder stopLimitOrder = (StopLimitOrder)order;
+        if (stopLimitOrder.getSide() == Side.BUY) {
+            return stopPrice < stopLimitOrder.getStopPrice();
+        } else {
+            return stopPrice > stopLimitOrder.getStopPrice();
+        }
+    }
 }
