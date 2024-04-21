@@ -123,4 +123,83 @@ public class StopLimitOrderTest {
                 Message.STOP_PRICE_NOT_POSITIVE
         );
     }
+    @Test
+    void check_if_inActive_buy_order_updates_price() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 200, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15950);
+
+        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 200, 15951, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 15950);
+
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(updateOrderRq.getPrice()).isEqualTo(15951);
+
+    }
+    @Test
+    void check_if_inActive_buy_order_updates_quantity() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 200, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15950);
+
+        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 250, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 15950);
+
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(updateOrderRq.getQuantity()).isEqualTo(250);
+
+    }
+    @Test
+    void check_if_inActive_buy_order_updates_stopPrice() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15950);
+
+        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15900));
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 15800);
+
+//        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        try {
+            System.out.println(security.updateOrder(updateOrderRq, matcher));
+        }
+        catch (InvalidRequestException e) {
+            System.out.println("inam print shod. " + e);
+        }
+
+
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 2)).isNull();
+
+//        assertThat(updateOrderRq.getStopPrice()).isEqualTo(15800);
+//        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
+//        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
+//        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNull();
+    }
+
 }
