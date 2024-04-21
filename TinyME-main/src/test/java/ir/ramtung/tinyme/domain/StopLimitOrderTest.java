@@ -9,6 +9,7 @@ import ir.ramtung.tinyme.messaging.Message;
 import ir.ramtung.tinyme.messaging.event.OrderRejectedEvent;
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
+import ir.ramtung.tinyme.messaging.request.OrderEntryType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -76,6 +77,21 @@ public class StopLimitOrderTest {
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
         assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
     }
+
+    @Test
+    void check_if_sell_order_enqueues_to_inActive_queues() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.SELL, 200, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15);
+
+        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL,2)).isNotNull();
+    }
     @Test
     void check_if_buy_order_enqueues_to_buy_queues() {
         int testBrokerCredit = 20_000_000;
@@ -90,5 +106,21 @@ public class StopLimitOrderTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
         assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNull();
+    }
+
+    @Test
+    void check_if_enter_buy_order_request_with_stop_price_less_than_zero_gets_rejected() {
+        EnterOrderRq enterOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 200, 15900, broker.getBrokerId(),
+                shareholder.getShareholderId(), -1);
+
+        orderHandler.handleEnterOrder(enterOrderRq);
+        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
+        verify(eventPublisher).publish(orderRejectedCaptor.capture());
+        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
+        assertThat(outputEvent.getOrderId()).isEqualTo(2);
+        assertThat(outputEvent.getErrors()).contains(
+                Message.STOP_PRICE_NOT_POSITIVE
+        );
     }
 }
