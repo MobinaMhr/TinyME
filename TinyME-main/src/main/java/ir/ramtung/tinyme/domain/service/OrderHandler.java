@@ -44,8 +44,9 @@ public class OrderHandler {
 
             MatchResult matchResult;
 
-            if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER)
+            if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
+            }
             else
                 matchResult = security.updateOrder(enterOrderRq, matcher);
             if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
@@ -60,6 +61,8 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.ORDER_NOT_MET_MEQ_VALUE)));
                 return;
             }
+            if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE)
+                return;
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER)
                 eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
             else
@@ -67,8 +70,21 @@ public class OrderHandler {
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
+            executeActivatedSLO(security.getOrderBook().activateCandidateOrders(security.getLastTradePrice()), enterOrderRq);
+
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
+        }
+    }
+
+    public void executeActivatedSLO(Order orderUnderActivation, EnterOrderRq enterOrderRq){
+        MatchResult matchResult = matcher.execute(orderUnderActivation);
+        if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
+            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
+            return;
+        }
+        if (!matchResult.trades().isEmpty()) {
+            eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
         }
     }
 
@@ -124,4 +140,12 @@ public class OrderHandler {
         if (!errors.isEmpty())
             throw new InvalidRequestException(errors);
     }
+//    public void someFunc(Order order, int lastTradePrice) {
+//        var inactiveOrderQueue = order.getSecurity().getOrderBook().getInactiveOrderQueue();
+//        var it = inactiveOrderQueue.listIterator();
+//        while (it.hasNext()) {
+//            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice))
+//                enqueue(it.next());
+//        }
+//    }
 }

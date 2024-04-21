@@ -7,6 +7,7 @@ import ir.ramtung.tinyme.domain.service.Matcher;
 import ir.ramtung.tinyme.messaging.Message;
 import lombok.Builder;
 import lombok.Getter;
+import org.apache.commons.lang3.ObjectUtils;
 
 import java.util.List;
 
@@ -28,21 +29,34 @@ public class Security {
                 orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
             return MatchResult.notEnoughPositions();
         Order order;
-        if (enterOrderRq.getPeakSize() == 0)
+        if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0)
             order = new Order(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
                     enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder, enterOrderRq.getEntryTime(),
                     OrderStatus.NEW, enterOrderRq.getMinimumExecutionQuantity());
-        else
+        else if (enterOrderRq.getPeakSize() > 0 && enterOrderRq.getStopPrice() == 0)
             order = new IcebergOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
                     enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
                     enterOrderRq.getEntryTime(), enterOrderRq.getPeakSize(), OrderStatus.NEW,
                     enterOrderRq.getMinimumExecutionQuantity());
+        else
+            order = new StopLimitOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
+                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
+                    enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
 
-//        return matcher.execute(order);
 //        return matcher.execute(order);
 //        some where else in update this is called
         MatchResult result = matcher.execute(order);
-        lastTradePrice = result.trades().getLast().getPrice();
+        if (!result.trades().isEmpty())
+            lastTradePrice = result.trades().getLast().getPrice();
+        ////////////////////////////////////////////////////////////////////////////
+        Order popedSLOrder = orderBook.activateCandidateOrders(lastTradePrice);
+        if (popedSLOrder == null) {
+            return result;
+        }
+
+        MatchResult result2 = matcher.execute(order);
+
+        // here handle kosshers
         return result;
     }
 

@@ -16,6 +16,8 @@ public class Matcher {
 
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
             if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
+                if (stopLimitOrder.getSide() == Side.BUY && stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice()))
+                    return  MatchResult.notEnoughCredit();
                 orderBook.DeActive(newOrder);
                 return MatchResult.notMetLastTradePrice();
             }

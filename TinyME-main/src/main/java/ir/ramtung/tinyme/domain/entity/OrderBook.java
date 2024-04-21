@@ -17,10 +17,14 @@ public class OrderBook {
         sellQueue = new LinkedList<>();
         inactiveOrderQueue = new LinkedList<>();
     }
-
     public void DeActive(Order order) {
         assert order instanceof StopLimitOrder;
         inactiveOrderQueue.add(order);
+    }
+    public void Active(Order order) {
+        assert order instanceof StopLimitOrder;
+        inactiveOrderQueue.remove(order);
+        enqueue(order);
     }
 
     public void enqueue(Order order) {
@@ -102,14 +106,16 @@ public class OrderBook {
                 .sum();
     }
 
-    public void activateCandidateOrders(int lastTradePrice){
+    public Order activateCandidateOrders(int lastTradePrice){
         var it = inactiveOrderQueue.listIterator();
         while (it.hasNext()) {
             if (it.next() instanceof StopLimitOrder stopLimitOrder) {
                 if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice))
-                    enqueue(it.next());
+                    return it.next();
+//                    enqueue(it.next());
             }
         }
+        return null;
     }
 
     public Order findByOrderIdForInactiveQueue(long orderId) {

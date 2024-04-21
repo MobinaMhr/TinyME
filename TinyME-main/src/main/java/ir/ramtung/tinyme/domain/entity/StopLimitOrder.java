@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class StopLimitOrder extends Order {
-    int stopPrice;
     public StopLimitOrder(long orderId, Security security, Side side, int quantity, int price, Broker broker, Shareholder shareholder, LocalDateTime entryTime, OrderStatus status, int stopPrice) {
         super(orderId, security, side, quantity, price, broker, shareholder, entryTime, status, 0);
         this.stopPrice = stopPrice;
