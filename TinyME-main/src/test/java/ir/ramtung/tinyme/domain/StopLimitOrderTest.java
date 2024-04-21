@@ -26,7 +26,16 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest
 @Import(MockedJMSTestConfig.class)
 public class StopLimitOrderTest {
-
+    @Autowired
+    OrderHandler orderHandler;
+    @Autowired
+    EventPublisher eventPublisher;
+    @Autowired
+    SecurityRepository securityRepository;
+    @Autowired
+    BrokerRepository brokerRepository;
+    @Autowired
+    ShareholderRepository shareholderRepository;
     private static final int MAIN_BROKER_CREDIT = 100_000_000;
     private Security security;
     private Broker broker;
@@ -35,18 +44,21 @@ public class StopLimitOrderTest {
     private List<Order> orders;
     @Autowired
     private Matcher matcher;
-    @Autowired
-    private OrderHandler orderHandler;
-    @Autowired
-    private EventPublisher eventPublisher;
 
     @BeforeEach
     void setupOrderBook() {
-        security = Security.builder().build();
-        broker = Broker.builder().credit(MAIN_BROKER_CREDIT).build();
+        securityRepository.clear();
+        brokerRepository.clear();
+        shareholderRepository.clear();
+
+        security = Security.builder().isin("ABC").build();
+
+        broker = Broker.builder().credit(MAIN_BROKER_CREDIT).brokerId(1).build();
         shareholder = Shareholder.builder().build();
+        shareholderRepository.addShareholder(shareholder);
         shareholder.incPosition(security, 100_000);
         orderBook = security.getOrderBook();
+        securityRepository.addSecurity(security);
 
         orders = Arrays.asList(
                 new Order(1, security, Side.BUY, 304, 15700, broker, shareholder),
@@ -81,12 +93,13 @@ public class StopLimitOrderTest {
     void check_if_sell_order_enqueues_to_inActive_queues() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-
+        brokerRepository.addBroker(testBroker);
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
                 LocalDateTime.now(), Side.SELL, 200, 15900, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 0, 15);
 
-        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+//        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        orderHandler.handleEnterOrder(enterOrderRq);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
         assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL,2)).isNotNull();

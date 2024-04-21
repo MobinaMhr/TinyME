@@ -123,19 +123,24 @@ public class OrderBook {
     }
 
     public StopLimitOrder getActivateCandidateOrders(int lastTradePrice){
-        StopLimitOrder stopLimitOrder = inactiveSellOrderQueue.getFirst();
-        if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
-            inactiveSellOrderQueue.removeFirst();
-            return stopLimitOrder;
-        }
-        stopLimitOrder = inactiveBuyOrderQueue.getFirst();
-        if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
-            inactiveBuyOrderQueue.removeFirst();
-            stopLimitOrder.getBroker().increaseCreditBy(stopLimitOrder.getValue());
-            return stopLimitOrder;
-        }
-        else
+        if (!inactiveSellOrderQueue.isEmpty()) {
+            StopLimitOrder stopLimitOrder = inactiveSellOrderQueue.getFirst();
+            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
+                inactiveSellOrderQueue.removeFirst();
+                return stopLimitOrder;
+            }
             return null;
+        }
+        if(!inactiveBuyOrderQueue.isEmpty()) {
+            StopLimitOrder stopLimitOrder = inactiveBuyOrderQueue.getFirst();
+            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
+                inactiveBuyOrderQueue.removeFirst();
+                stopLimitOrder.getBroker().increaseCreditBy(stopLimitOrder.getValue());
+                return stopLimitOrder;
+            }
+            return null;
+        }
+        return null;
     }
 
     public Order findByOrderIdForInactiveQueue(Side side, long orderId) {
