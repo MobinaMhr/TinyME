@@ -131,6 +131,7 @@ public class OrderBook {
         stopLimitOrder = inactiveBuyOrderQueue.getFirst();
         if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)){
             inactiveBuyOrderQueue.removeFirst();
+            stopLimitOrder.getBroker().increaseCreditBy(stopLimitOrder.getValue());
             return stopLimitOrder;
         }
         else
