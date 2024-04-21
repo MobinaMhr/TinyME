@@ -6,9 +6,15 @@ import ir.ramtung.tinyme.domain.service.Matcher;
 import ir.ramtung.tinyme.domain.service.OrderHandler;
 import ir.ramtung.tinyme.messaging.EventPublisher;
 import ir.ramtung.tinyme.messaging.Message;
+import ir.ramtung.tinyme.messaging.event.OrderAcceptedEvent;
+import ir.ramtung.tinyme.messaging.event.OrderActivateEvent;
+import ir.ramtung.tinyme.messaging.event.OrderExecutedEvent;
 import ir.ramtung.tinyme.messaging.event.OrderRejectedEvent;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
+import ir.ramtung.tinyme.repository.BrokerRepository;
+import ir.ramtung.tinyme.repository.SecurityRepository;
+import ir.ramtung.tinyme.repository.ShareholderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +27,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -63,7 +71,8 @@ public class StopLimitOrderTest {
         orders = Arrays.asList(
                 new Order(1, security, Side.BUY, 304, 15700, broker, shareholder),
                 new Order(6, security, Side.SELL, 100, 15800, broker, shareholder),
-                new Order(7, security, Side.SELL, 100, 15810, broker, shareholder)
+                new Order(7, security, Side.SELL, 100, 15810, broker, shareholder),
+                new Order(8, security, Side.SELL, 100, 15820, broker, shareholder)
         );
         orders.forEach(order -> orderBook.enqueue(order));
 
@@ -218,8 +227,77 @@ public class StopLimitOrderTest {
         assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
 
         assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
-
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (250 * 15700));
     }
+
+    @Test
+    void check_if_buy_inactive_queue_is_sorted_correctly() {
+        int testBrokerCredit = 20_000_000;
+
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).brokerId(2).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(4, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 90, 15810, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15810);
+
+        EnterOrderRq enterOrderRq2 = EnterOrderRq.createNewOrderRqWithStopPrice(5, security.getIsin(), 4,
+                LocalDateTime.now(), Side.BUY, 80, 15810, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15809);
+
+        EnterOrderRq enterOrderRq3 = EnterOrderRq.createNewOrderRq(6, security.getIsin(), 5,
+                LocalDateTime.now(), Side.BUY, 10, 15810, 2,
+                shareholder.getShareholderId(), 0);
+
+        orderHandler.handleEnterOrder(enterOrderRq);
+        verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
+        orderHandler.handleEnterOrder(enterOrderRq2);
+        verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
+        orderHandler.handleEnterOrder(enterOrderRq3);
+
+        verify(eventPublisher).publish(new OrderActivateEvent(6, 4));
+        verify(eventPublisher).publish(new OrderActivateEvent(6, 3));
+
+        verify(eventPublisher,times(3)).publish(any(OrderExecutedEvent.class));
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - ((10 + 90 + 80) * 15810));
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 5)).isNull();
+        System.out.println(orderBook.getBuyQueue());
+        assertThat(orderBook.getBuyQueue().size()).isEqualTo(2);
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 3)).isNull();
+    }
+
+    @Test
+    void check_if_activation_function_activates_other_inactives() {
+        int testBrokerCredit = 20_000_000;
+
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).brokerId(2).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(4, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 90, 15820, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15810);
+
+        EnterOrderRq enterOrderRq2 = EnterOrderRq.createNewOrderRqWithStopPrice(5, security.getIsin(), 4,
+                LocalDateTime.now(), Side.BUY, 110, 15820, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15790);
+
+
+        orderHandler.handleEnterOrder(enterOrderRq);
+        orderHandler.handleEnterOrder(enterOrderRq2);
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15820 + 100 * 15810));
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (90 * 15820 + 100 * 15810 + 10 * 15820));
+
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 3)).isNull();
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 4)).isNull();
+        assertThat(orderBook.findByOrderId(Side.BUY, 3)).isNull();
+        assertThat(orderBook.findByOrderId(Side.BUY, 4)).isNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 8)).isNull();
+    }
+
 }
+

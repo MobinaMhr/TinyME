@@ -62,10 +62,13 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.ORDER_NOT_MET_MEQ_VALUE)));
                 return;
             }
-            if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE)
-                return;
-            if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER)
+            if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
                 eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+                return;
+            }
+            if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER){
+                eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+            }
             else
                 eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
             if (!matchResult.trades().isEmpty()) {
@@ -86,12 +89,14 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
                 return;
             }
+            if(matchResult.outcome() == MatchingOutcome.EXECUTED){
+                eventPublisher.publish((new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId())));
+            }
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
             orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
         }
-
     }
 
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {
