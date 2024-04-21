@@ -14,12 +14,23 @@ public class Matcher {
 
         int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
 
+//        if (newOrder instanceof StopLimitOrder stopLimitOrder) {
+//            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
+//                if (stopLimitOrder.getSide() == Side.BUY
+//                        && !stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice())) {
+//                    return MatchResult.notEnoughCredit();
+//                }
+//                orderBook.DeActive(newOrder);
+//                return MatchResult.notMetLastTradePrice();
+//            }
+//        }
+
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
-            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
-                if (stopLimitOrder.getSide() == Side.BUY
-                        && !stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice())) {
-                    return MatchResult.notEnoughCredit();
-                }
+            if (stopLimitOrder.getSide() == Side.BUY
+                    && !stopLimitOrder.getBroker().hasEnoughCredit(stopLimitOrder.getPrice())) {
+                return MatchResult.notEnoughCredit();
+            }
+            if (!stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
                 orderBook.DeActive(newOrder);
                 return MatchResult.notMetLastTradePrice();
             }
@@ -94,7 +105,7 @@ public class Matcher {
         }
         
         if (order.getStatus() == OrderStatus.NEW){
-            if(! isMEQFilterPassedBy(result.remainder(), prevQuantity)){
+            if(!isMEQFilterPassedBy(result.remainder(), prevQuantity)){
                 rollbackTrades(order, result.trades());
                 return MatchResult.notMetMEQValue();
             }
