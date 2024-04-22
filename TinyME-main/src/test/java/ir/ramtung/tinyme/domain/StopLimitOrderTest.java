@@ -270,7 +270,7 @@ public class StopLimitOrderTest {
     }
 
     @Test
-    void check_if_activation_function_activates_other_inactives() {
+    void check_if_activation_function_activates_other_buy_inActives() {
         int testBrokerCredit = 20_000_000;
 
         Broker testBroker = Broker.builder().credit(testBrokerCredit).brokerId(2).build();
@@ -298,6 +298,47 @@ public class StopLimitOrderTest {
         assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 8)).isNull();
     }
+    @Test
+    void check_if_activation_function_activates_other_sell_inActives() {
+        int testBrokerCredit = 20_000_000;
 
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).brokerId(2).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(4, security.getIsin(), 3,
+                LocalDateTime.now(), Side.SELL, 90, 15600, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 16000);
+
+        EnterOrderRq enterOrderRq2 = EnterOrderRq.createNewOrderRqWithStopPrice(5, security.getIsin(), 4,
+                LocalDateTime.now(), Side.SELL, 110, 15600, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 16000);
+
+
+        orderHandler.handleEnterOrder(enterOrderRq);
+        orderHandler.handleEnterOrder(enterOrderRq2);
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit + (90 * 15700 + 110 * 15700));
+
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL, 3)).isNull();
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL, 4)).isNull();
+        assertThat(orderBook.findByOrderId(Side.BUY, 1)).isNotNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 6)).isNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNotNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 8)).isNotNull();
+
+
+        EnterOrderRq enterOrderRq3 = EnterOrderRq.createNewOrderRqWithStopPrice(6, security.getIsin(), 5,
+                LocalDateTime.now(), Side.BUY, 10, 15820, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15000);
+
+        orderHandler.handleEnterOrder(enterOrderRq3);
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (10 * 15810));
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit + (90 * 15700 + 110 * 15700) - (10 * 15810));
+
+        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 5)).isNull();
+        assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNotNull();
+    }
 }
 
