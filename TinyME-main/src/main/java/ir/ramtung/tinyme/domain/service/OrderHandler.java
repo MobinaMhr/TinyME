@@ -86,7 +86,7 @@ public class OrderHandler {
     }
 
     public void executeActivatedSLO(EnterOrderRq enterOrderRq, Security security){
-        StopLimitOrder orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
+        StopLimitOrder orderUnderActivation = security.getInactiveOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
 
         while (orderUnderActivation != null){
             MatchResult matchResult = matcher.execute(orderUnderActivation);
@@ -102,7 +102,7 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
 
-            orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
+            orderUnderActivation = security.getInactiveOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
         }
     }
 

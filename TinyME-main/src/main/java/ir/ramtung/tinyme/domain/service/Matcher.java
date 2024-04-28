@@ -10,6 +10,7 @@ import java.util.ListIterator;
 public class Matcher {
     public MatchResult match(Order newOrder) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
+        InactiveOrderBook inactiveOrderBook = newOrder.getSecurity().getInactiveOrderBook();
         LinkedList<Trade> trades = new LinkedList<>();
 
         int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
@@ -20,7 +21,7 @@ public class Matcher {
                 return MatchResult.notEnoughCredit();
             }
             if (!stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
-                orderBook.DeActive(newOrder);
+                inactiveOrderBook.DeActive(newOrder);
                 return MatchResult.notMetLastTradePrice();
             }
         }

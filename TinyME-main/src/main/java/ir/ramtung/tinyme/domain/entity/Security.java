@@ -21,6 +21,9 @@ public class Security {
     private int lotSize = 1;
     @Builder.Default
     private OrderBook orderBook = new OrderBook();
+    @Builder.Default
+    private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
+
     private int lastTradePrice;
 
 
@@ -60,18 +63,19 @@ public class Security {
     public void deleteOrder(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null)
-            order = orderBook.findByOrderIdForInactiveQueue(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+            order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         if (order.getSide() == Side.BUY)
             order.getBroker().increaseCreditBy(order.getValue());
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
         if (updateOrderRq.getStopPrice() > 0) {
-            order = orderBook.findByOrderIdForInactiveQueue(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+            order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
             if (order == null){
                 throw new InvalidRequestException(Message.STOP_LIMIT_ORDER_ID_NOT_FOUND);
             }
@@ -115,6 +119,7 @@ public class Security {
         }
 
         orderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+        inactiveOrderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         MatchResult matchResult = matcher.execute(order);
         if (matchResult.outcome() != MatchingOutcome.EXECUTED && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             orderBook.enqueue(originalOrder);

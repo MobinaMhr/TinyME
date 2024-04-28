@@ -49,6 +49,7 @@ public class StopLimitOrderTest {
     private Broker broker;
     private Shareholder shareholder;
     private OrderBook orderBook;
+    private InactiveOrderBook inactiveOrderBook;
     private List<Order> orders;
     @Autowired
     private Matcher matcher;
@@ -66,6 +67,7 @@ public class StopLimitOrderTest {
         shareholderRepository.addShareholder(shareholder);
         shareholder.incPosition(security, 100_000);
         orderBook = security.getOrderBook();
+        inactiveOrderBook = security.getInactiveOrderBook();
         securityRepository.addSecurity(security);
 
         orders = Arrays.asList(
@@ -95,7 +97,7 @@ public class StopLimitOrderTest {
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
     }
 
     @Test
@@ -111,7 +113,7 @@ public class StopLimitOrderTest {
         orderHandler.handleEnterOrder(enterOrderRq);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.SELL,2)).isNotNull();
     }
     @Test
     void check_if_buy_order_enqueues_to_buy_queues() {
@@ -126,7 +128,7 @@ public class StopLimitOrderTest {
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNull();
     }
 
     @Test
@@ -156,7 +158,7 @@ public class StopLimitOrderTest {
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
         EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
                 LocalDateTime.now(), Side.BUY, 200, 15951, testBroker.getBrokerId(),
@@ -178,7 +180,7 @@ public class StopLimitOrderTest {
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
         EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
                 LocalDateTime.now(), Side.BUY, 250, 15900, testBroker.getBrokerId(),
@@ -199,11 +201,11 @@ public class StopLimitOrderTest {
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15900));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
         DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.BUY, 2);
         assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(deleteOrderRq.getSide(),deleteOrderRq.getOrderId())).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(),deleteOrderRq.getOrderId())).isNull();
     }
     @Test
     void check_if_updated_stop_limit_order_remains_in_inActive_queue() {
@@ -218,7 +220,7 @@ public class StopLimitOrderTest {
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15700));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
         EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
                 LocalDateTime.now(), Side.BUY, 250, 15700, testBroker.getBrokerId(),
@@ -226,7 +228,7 @@ public class StopLimitOrderTest {
 
         assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
 
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY,2)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (250 * 15700));
     }
@@ -263,10 +265,10 @@ public class StopLimitOrderTest {
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - ((10 + 90 + 80) * 15810));
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 5)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 5)).isNull();
         System.out.println(orderBook.getBuyQueue());
         assertThat(orderBook.getBuyQueue().size()).isEqualTo(2);
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 3)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
     }
 
     @Test
@@ -291,8 +293,8 @@ public class StopLimitOrderTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15820 + 100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (90 * 15820 + 100 * 15810 + 10 * 15820));
 
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 3)).isNull();
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 4)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 4)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 4)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNull();
@@ -320,8 +322,8 @@ public class StopLimitOrderTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit + (90 * 15700 + 110 * 15700));
 
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL, 3)).isNull();
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.SELL, 4)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.SELL, 3)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.SELL, 4)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 1)).isNotNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 6)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNotNull();
@@ -337,7 +339,7 @@ public class StopLimitOrderTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (10 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit + (90 * 15700 + 110 * 15700) - (10 * 15810));
 
-        assertThat(orderBook.findByOrderIdForInactiveQueue(Side.BUY, 5)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 5)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNotNull();
     }
 }

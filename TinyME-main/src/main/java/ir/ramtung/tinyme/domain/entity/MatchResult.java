@@ -65,6 +65,4 @@ public final class MatchResult {
                 "remainder=" + remainder + ", " +
                 "trades=" + trades + ']';
     }
-
-
 }
