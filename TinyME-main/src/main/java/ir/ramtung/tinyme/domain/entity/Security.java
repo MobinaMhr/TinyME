@@ -82,8 +82,6 @@ public class Security {
         }
         if (order == null)
             order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-
-
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)

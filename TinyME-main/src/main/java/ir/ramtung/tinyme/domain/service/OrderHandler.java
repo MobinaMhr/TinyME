@@ -34,52 +34,52 @@ public class OrderHandler {
         this.matcher = matcher;
     }
 
+    public boolean resultPublisher(MatchResult matchResult, EnterOrderRq enterOrderRq) {
+        if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
+            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
+            return true;
+        }
+        if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_POSITIONS) {
+            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.SELLER_HAS_NOT_ENOUGH_POSITIONS)));
+            return true;
+        }
+        if (matchResult.outcome() == MatchingOutcome.NOT_MET_MEQ_VALUE) {
+            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.ORDER_NOT_MET_MEQ_VALUE)));
+            return true;
+        }
+        if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
+            eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+            return true;
+        }
+        if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER){
+            eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+        }
+        else {
+            eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+        }
+        if (!matchResult.trades().isEmpty()) {
+            eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
+        }
+        return false;
+    }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
         try {
-
             validateEnterOrderRq(enterOrderRq);
 
             Security security = securityRepository.findSecurityByIsin(enterOrderRq.getSecurityIsin());
             Broker broker = brokerRepository.findBrokerById(enterOrderRq.getBrokerId());
             Shareholder shareholder = shareholderRepository.findShareholderById(enterOrderRq.getShareholderId());
-
             MatchResult matchResult;
-
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
             }
             else
                 matchResult = security.updateOrder(enterOrderRq, matcher);
 
-            if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
-                eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
+            if(resultPublisher(matchResult, enterOrderRq)){
                 return;
-            }
-            if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_POSITIONS) {
-                eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.SELLER_HAS_NOT_ENOUGH_POSITIONS)));
-                return;
-            }
-
-            if (matchResult.outcome() == MatchingOutcome.NOT_MET_MEQ_VALUE) {
-                eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.ORDER_NOT_MET_MEQ_VALUE)));
-                return;
-            }
-            if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
-                eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
-                return;
-            }
-
-            if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER){
-                eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
-            }
-            else
-                eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
-
-            if (!matchResult.trades().isEmpty()) {
-                eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
             executeActivatedSLO(enterOrderRq, security);
-
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
         }
