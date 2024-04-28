@@ -1,19 +1,28 @@
 package ir.ramtung.tinyme.domain.service;
 
 import ir.ramtung.tinyme.domain.entity.*;
+import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedList;
 import java.util.ListIterator;
 
+@Getter
 @Service
 public class Matcher {
+    private int lastTradePrice;
+
+    private void updateLastTradePrice(MatchResult result) {
+        if (result.trades().isEmpty()) {
+            return;
+        }
+        lastTradePrice = result.trades().getLast().getPrice();
+    }
+
     public MatchResult match(Order newOrder) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
         InactiveOrderBook inactiveOrderBook = newOrder.getSecurity().getInactiveOrderBook();
         LinkedList<Trade> trades = new LinkedList<>();
-
-        int lastTradePrice = newOrder.getSecurity().getLastTradePrice();
 
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
             if (stopLimitOrder.getSide() == Side.BUY
@@ -119,6 +128,7 @@ public class Matcher {
             trade.getSell().getShareholder().decPosition(trade.getSecurity(), trade.getQuantity());
         }
 
+        updateLastTradePrice(result);
         return result;
     }
 

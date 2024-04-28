@@ -22,6 +22,6 @@ public class Message {
     public static final String ORDER_CANNOT_BE_ICEBERG_AND_STOP_LIMIT = "Order cannot be iceberg and stop limit";
     public static final String ORDER_CANNOT_HAVE_MEQ_AND_BE_STOP_LIMIT = "Order cannot have minimum execution quantity and be stop limit";
     public static final String MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY = "Minimum execution quantity cannot be more than order quantity";
-    public static final String STOP_LIMIT_ORDER_ID_NOT_FOUND = "Stop limit order ID not found in the order book";
+    public static final String CANNOT_UPDATE_ACTIVE_STOP_LIMIT_ORDER = "cannot update active stop limit order";
 
 }
