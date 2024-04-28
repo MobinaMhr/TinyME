@@ -381,13 +381,17 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), 15790);
         orderHandler.handleEnterOrder(updateOrderRq);
         verify(eventPublisher).publish(new OrderActivateEvent(5, 2));
-//        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
-//        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
+        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
+        verify(eventPublisher,times(2)).publish(any(OrderExecutedEvent.class));
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 2)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 2)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 7)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL, 8)).isNotNull();
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810 + 10 * 15820));
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810 + 10 * 15820));
 
     }
 }
