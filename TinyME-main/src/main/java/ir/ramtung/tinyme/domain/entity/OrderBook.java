@@ -19,6 +19,7 @@ public class OrderBook {
         inactiveSellOrderQueue = new LinkedList<>();
         inactiveBuyOrderQueue = new LinkedList<>();
     }
+
     public void DeActive(Order order) {
         assert order instanceof StopLimitOrder;
         enqueueInactiveOrder(order);
@@ -69,6 +70,7 @@ public class OrderBook {
     }
 
     public boolean removeByOrderId(Side side, long orderId) {
+
         var queue = getQueue(side);
         var it = queue.listIterator();
         while (it.hasNext()) {
@@ -77,6 +79,7 @@ public class OrderBook {
                 return true;
             }
         }
+
         LinkedList<StopLimitOrder> inactiveQueue = getInactiveQueue(side);
         var inactiveIt = inactiveQueue.listIterator();
         while (inactiveIt.hasNext()) {
@@ -85,6 +88,7 @@ public class OrderBook {
                 return true;
             }
         }
+
         return false;
     }
 

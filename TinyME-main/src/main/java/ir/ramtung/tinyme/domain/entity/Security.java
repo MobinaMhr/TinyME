@@ -23,6 +23,14 @@ public class Security {
     private OrderBook orderBook = new OrderBook();
     private int lastTradePrice;
 
+
+    private void updateLastTradePrice(MatchResult result) {
+        if (result.trades().isEmpty()) {
+            return;
+        }
+        lastTradePrice = result.trades().getLast().getPrice();
+    }
+
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
@@ -45,8 +53,7 @@ public class Security {
 
 
         MatchResult result = matcher.execute(order);
-        if (!result.trades().isEmpty())
-            lastTradePrice = result.trades().getLast().getPrice();
+        updateLastTradePrice(result);
         return result;
     }
 
@@ -82,11 +89,11 @@ public class Security {
         if (order.getMinimumExecutionQuantity() != updateOrderRq.getMinimumExecutionQuantity())
             throw new InvalidRequestException(Message.CANNOT_CHANGE_MEQ_DURING_UPDATE);
 
-
         if (updateOrderRq.getSide() == Side.SELL &&
                 !order.getShareholder().hasEnoughPositionsOn(this,
-                orderBook.totalSellQuantityByShareholder(order.getShareholder()) - order.getQuantity() + updateOrderRq.getQuantity()))
+                orderBook.totalSellQuantityByShareholder(order.getShareholder()) - order.getQuantity() + updateOrderRq.getQuantity())) {
             return MatchResult.notEnoughPositions();
+        }
 
         boolean losesPriority = order.isQuantityIncreased(updateOrderRq.getQuantity())
                 || updateOrderRq.getPrice() != order.getPrice()
@@ -96,8 +103,10 @@ public class Security {
         if (updateOrderRq.getSide() == Side.BUY) {
             order.getBroker().increaseCreditBy(order.getValue());
         }
+
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
+
         if (!losesPriority) {
             if (updateOrderRq.getSide() == Side.BUY) {
                 order.getBroker().decreaseCreditBy(order.getValue());

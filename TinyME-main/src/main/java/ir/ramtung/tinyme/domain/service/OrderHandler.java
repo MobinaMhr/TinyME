@@ -50,6 +50,7 @@ public class OrderHandler {
             }
             else
                 matchResult = security.updateOrder(enterOrderRq, matcher);
+
             if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
                 return;
@@ -58,6 +59,7 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.SELLER_HAS_NOT_ENOUGH_POSITIONS)));
                 return;
             }
+
             if (matchResult.outcome() == MatchingOutcome.NOT_MET_MEQ_VALUE) {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.ORDER_NOT_MET_MEQ_VALUE)));
                 return;
@@ -66,11 +68,13 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
                 return;
             }
+
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER){
                 eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
             }
             else
                 eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
@@ -83,18 +87,21 @@ public class OrderHandler {
 
     public void executeActivatedSLO(EnterOrderRq enterOrderRq, Security security){
         StopLimitOrder orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
+
         while (orderUnderActivation != null){
             MatchResult matchResult = matcher.execute(orderUnderActivation);
+
             if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
                 return;
             }
             if(matchResult.outcome() == MatchingOutcome.EXECUTED){
-                eventPublisher.publish((new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId())));
+                eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
             }
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
+
             orderUnderActivation = security.getOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
         }
     }
@@ -150,19 +157,17 @@ public class OrderHandler {
 
     private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
-        if (deleteOrderRq.getOrderId() <= 0)
+
+        if (deleteOrderRq.getOrderId() <= 0) {
             errors.add(Message.INVALID_ORDER_ID);
-        if (securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin()) == null)
+        }
+
+        if (securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin()) == null) {
             errors.add(Message.UNKNOWN_SECURITY_ISIN);
-        if (!errors.isEmpty())
+        }
+
+        if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
+        }
     }
-//    public void someFunc(Order order, int lastTradePrice) {
-//        var inactiveOrderQueue = order.getSecurity().getOrderBook().getInactiveOrderQueue();
-//        var it = inactiveOrderQueue.listIterator();
-//        while (it.hasNext()) {
-//            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice))
-//                enqueue(it.next());
-//        }
-//    }
 }
