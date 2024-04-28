@@ -24,16 +24,6 @@ public class Security {
     @Builder.Default
     private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
 
-    private int lastTradePrice;
-
-
-    private void updateLastTradePrice(MatchResult result) {
-        if (result.trades().isEmpty()) {
-            return;
-        }
-        lastTradePrice = result.trades().getLast().getPrice();
-    }
-
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
@@ -56,7 +46,6 @@ public class Security {
 
 
         MatchResult result = matcher.execute(order);
-        updateLastTradePrice(result);
         return result;
     }
 
@@ -74,16 +63,18 @@ public class Security {
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
-        if (updateOrderRq.getStopPrice() > 0) {
-            order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-            if (order == null){
-                throw new InvalidRequestException(Message.STOP_LIMIT_ORDER_ID_NOT_FOUND);
+
+        order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+        if (order == null) {
+            order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+            if (order != null && updateOrderRq.getStopPrice() > 0) {
+                throw new InvalidRequestException(Message.CANNOT_UPDATE_ACTIVE_STOP_LIMIT_ORDER);
             }
         }
-        if (order == null)
-            order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-        if (order == null)
+        if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
+        }
+
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
         if (!(order instanceof IcebergOrder) && updateOrderRq.getPeakSize() != 0)
