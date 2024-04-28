@@ -68,6 +68,11 @@ public class Order {
         this(orderId, security, side, quantity, price, broker, shareholder, LocalDateTime.now());
     }
 
+    public Order(StopLimitOrder stopLimitOrder){
+        this(stopLimitOrder.orderId, stopLimitOrder.security, stopLimitOrder.side,
+                stopLimitOrder.quantity, stopLimitOrder.price, stopLimitOrder.broker, stopLimitOrder.shareholder, stopLimitOrder.entryTime);
+    }
+
     public Order snapshot() {
         return new Order(orderId, security, side, quantity, price, broker, shareholder, entryTime, OrderStatus.SNAPSHOT,
                 minimumExecutionQuantity);

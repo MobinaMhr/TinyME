@@ -51,15 +51,12 @@ public class OrderHandler {
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
             return true;
         }
-        if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER){
+        if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER)
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
-        }
-        else {
+        else
             eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
-        }
-        if (!matchResult.trades().isEmpty()) {
+        if (!matchResult.trades().isEmpty())
             eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
-        }
         return false;
     }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
@@ -76,9 +73,8 @@ public class OrderHandler {
             else
                 matchResult = security.updateOrder(enterOrderRq, matcher);
 
-            if(resultPublisher(matchResult, enterOrderRq)){
+            if(resultPublisher(matchResult, enterOrderRq))
                 return;
-            }
             executeActivatedSLO(enterOrderRq, security);
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
@@ -89,7 +85,7 @@ public class OrderHandler {
         StopLimitOrder orderUnderActivation = security.getInactiveOrderBook().getActivateCandidateOrders(security.getLastTradePrice());
 
         while (orderUnderActivation != null){
-            MatchResult matchResult = matcher.execute(orderUnderActivation);
+            MatchResult matchResult = matcher.execute(new Order(orderUnderActivation));
 
             if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
                 eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), orderUnderActivation.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
@@ -136,7 +132,6 @@ public class OrderHandler {
         if(enterOrderRq.getStopPrice() > 0 && enterOrderRq.getPeakSize() > 0)
             errors.add(Message.ORDER_CANNOT_BE_ICEBERG_AND_STOP_LIMIT);
         Security security = securityRepository.findSecurityByIsin(enterOrderRq.getSecurityIsin());
-
         if (security == null)
             errors.add(Message.UNKNOWN_SECURITY_ISIN);
         else {
