@@ -380,8 +380,8 @@ public class StopLimitOrderTest {
                 LocalDateTime.now(), Side.BUY, 100, 15820, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 15790);
         orderHandler.handleEnterOrder(updateOrderRq);
-//        verify(eventPublisher).publish(new OrderActivateEvent(5, 2));
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
+        verify(eventPublisher).publish(new OrderActivateEvent(5, 2));
+//        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
 //        assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 2)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 3)).isNull();

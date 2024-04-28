@@ -69,13 +69,13 @@ public class OrderHandler {
             MatchResult matchResult;
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
-                if (matchResult.outcome() == MatchingOutcome.EXECUTED && enterOrderRq.getStopPrice() > 0){
-                    eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
-                }
             }
             else
                 matchResult = security.updateOrder(enterOrderRq, matcher);
 
+            if (matchResult.outcome() == MatchingOutcome.EXECUTED && enterOrderRq.getStopPrice() > 0){
+                eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
+            }
             if(resultPublisher(matchResult, enterOrderRq))
                 return;
             executeActivatedSLO(enterOrderRq, security);
