@@ -12,6 +12,7 @@ import ir.ramtung.tinyme.messaging.request.OrderEntryType;
 import ir.ramtung.tinyme.repository.BrokerRepository;
 import ir.ramtung.tinyme.repository.SecurityRepository;
 import ir.ramtung.tinyme.repository.ShareholderRepository;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedList;
@@ -67,13 +68,18 @@ public class OrderHandler {
             Broker broker = brokerRepository.findBrokerById(enterOrderRq.getBrokerId());
             Shareholder shareholder = shareholderRepository.findShareholderById(enterOrderRq.getShareholderId());
             MatchResult matchResult;
+            boolean isTypeStopLimitOrder;
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
+                isTypeStopLimitOrder = enterOrderRq.getStopPrice() > 0;
             }
-            else
+            else{
+                isTypeStopLimitOrder = security.getInactiveOrderBook()
+                        .findByOrderId(enterOrderRq.getSide(),enterOrderRq.getOrderId()) != null;
                 matchResult = security.updateOrder(enterOrderRq, matcher);
+            }
 
-            if (matchResult.outcome() == MatchingOutcome.EXECUTED && enterOrderRq.getStopPrice() > 0){
+            if (matchResult.outcome() == MatchingOutcome.EXECUTED && isTypeStopLimitOrder){
                 eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
             }
             if(resultPublisher(matchResult, enterOrderRq))

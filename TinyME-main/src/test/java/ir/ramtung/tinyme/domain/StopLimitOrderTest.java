@@ -394,5 +394,29 @@ public class StopLimitOrderTest {
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810 + 10 * 15820));
 
     }
+
+    @Test
+    void check_if_update_slo_stop_price_to_zero_works() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).brokerId(2).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 200, 15700, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15950);
+
+        assertThatNoException().isThrownBy(() -> security.newOrder(enterOrderRq, testBroker, shareholder, matcher));
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (200 * 15700));
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 250, 15700, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(updateOrderRq));
+        verify(eventPublisher).publish(new OrderActivateEvent(4, 2));
+    }
 }
 
