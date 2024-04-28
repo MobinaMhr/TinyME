@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
 public class StopLimitOrder extends Order {
+    protected int stopPrice;
+
     public StopLimitOrder(long orderId, Security security, Side side, int quantity, int price, Broker broker, Shareholder shareholder, LocalDateTime entryTime, OrderStatus status, int stopPrice) {
         super(orderId, security, side, quantity, price, broker, shareholder, entryTime, status, 0);
         this.stopPrice = stopPrice;
@@ -41,23 +43,6 @@ public class StopLimitOrder extends Order {
                 this.getSide() == Side.SELL && lastTradePrice <= this.getStopPrice();
     }
 
-//    @Override
-//    public int getQuantity() {
-//        return super.getQuantity();
-//    }
-
-//    @Override
-//    public void decreaseQuantity(int amount) {
-//        if (status == OrderStatus.NEW) {
-//            super.decreaseQuantity(amount);
-//            return;
-//        }
-//        if (amount > displayedQuantity)
-//            throw new IllegalArgumentException();
-//        quantity -= amount;
-//        displayedQuantity -= amount;
-//    }
-
     @Override
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         super.updateFromRequest(updateOrderRq);
@@ -66,16 +51,13 @@ public class StopLimitOrder extends Order {
 
     @Override
     public boolean queuesBefore(Order order) {
-        if (order.getSide() == Side.BUY) {
-            return stopPrice < order.getStopPrice();
-        } else {
-            return stopPrice > order.getStopPrice();
+        if (order instanceof StopLimitOrder stopLimitOrder) {
+            if (stopLimitOrder.getSide() == Side.BUY) {
+                return stopPrice < stopLimitOrder.getStopPrice();
+            } else {
+                return stopPrice > stopLimitOrder.getStopPrice();
+            }
         }
-//        StopLimitOrder stopLimitOrder = (StopLimitOrder)order;
-//        if (stopLimitOrder.getSide() == Side.BUY) {
-//            return stopPrice < stopLimitOrder.getStopPrice();
-//        } else {
-//            return stopPrice > stopLimitOrder.getStopPrice();
-//        }
+        return false;
     }
 }
