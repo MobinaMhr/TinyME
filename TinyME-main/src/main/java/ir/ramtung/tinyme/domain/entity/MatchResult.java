@@ -36,6 +36,10 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION, null, new LinkedList<>());
     }
 
+    public static MatchResult executedInAuction() {
+        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
+    }
+
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
         this.remainder = remainder;

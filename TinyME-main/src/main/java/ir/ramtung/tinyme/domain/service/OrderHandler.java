@@ -175,8 +175,6 @@ public class OrderHandler {
 
 
     private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) throws InvalidRequestException {
-        changeMatchingStateRq.getTargetState();// TODO.hadle errors related to getTargetState
-        //
         List<String> errors = new LinkedList<>();
 
         Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
