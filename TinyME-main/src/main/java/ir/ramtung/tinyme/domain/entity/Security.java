@@ -25,7 +25,7 @@ public class Security {
     private OrderBook orderBook = new OrderBook();
     @Builder.Default
     private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
-    private MatchingState currentMatchingState; //TODO:: do we need default??
+    private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
     // TODO : check if the matching state is on harraj and the order type doesn't satisfy the process, propagate error.
     // IcebergOrder                             ->  Allowed. same approach for changing priority
@@ -40,6 +40,7 @@ public class Security {
                 !shareholder.hasEnoughPositionsOn(this,
                 orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
             return MatchResult.notEnoughPositions();
+
         Order order;
         if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0)
             order = new Order(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
@@ -56,19 +57,14 @@ public class Security {
                     enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
 
 
-        // TODO : code for auctionExecute and separate procedure of code for different matching state
-        MatchResult result = matcher.execute(order);
+        MatchResult result = null;
+        if (currentMatchingState == MatchingState.AUCTION) {
+            result = matcher.auctionExecute(order);
+        } else if (currentMatchingState == MatchingState.CONTINUOUS) {
+            result = matcher.execute(order);
+        }
         return result;
     }
-//TODO.
-//    private MatchResult validateOrderType(Order order){
-//        if (order.getMinimumExecutionQuantity() > 0 && currentMatchingState == MatchingState.AUCTION){
-//            return
-//        }
-//        else if (order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
-//            return
-//        }
-//    }
 
     public void deleteOrder(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());

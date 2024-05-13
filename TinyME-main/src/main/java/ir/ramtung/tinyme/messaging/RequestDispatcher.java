@@ -24,7 +24,7 @@ public class RequestDispatcher {
         orderHandler.handleEnterOrder(enterOrderRq);
     }
     @JmsListener(destination = "${requestQueue}", selector = "_type='ir.ramtung.tinyme.messaging.request.ChangeMatchingStateRq'")
-    public void receiveEnterOrderRq(ChangeMatchingStateRq changeMatchingStateRq) {
+    public void receiveChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) {
         log.info("Received message: " + changeMatchingStateRq);
         orderHandler.handleChangeMatchingStateRq(changeMatchingStateRq);
     }

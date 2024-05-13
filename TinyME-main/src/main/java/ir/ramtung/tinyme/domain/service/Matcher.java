@@ -137,16 +137,26 @@ public class Matcher {
         updateLastTradePrice(result);
         return result;
     }
-    // TODO.
-    public void auctionExecute(Order order) {
+    public MatchResult auctionExecute(Order order) {
         if (order instanceof StopLimitOrder stopLimitOrder) {
-            //
+            return MatchResult.stopLimitOrderIsNotAllowedInAuction();
         }
-        else if (order instanceof IcebergOrder icebergOrder) {
-            //
+        if (order.getMinimumExecutionQuantity() > 0) {
+            return MatchResult.meqOrderIsNotAllowedInAuction();
         }
-        // check for other types of order.
-        // Add to order book.
+        // check for other types of order.TODO.
+
+        if (order.getSide() == Side.BUY) {
+            if (order.getBroker().getCredit() >= order.getValue())
+                order.getBroker().decreaseCreditBy(order.getValue());
+            else {
+                return MatchResult.notEnoughCredit();
+            }
+        }
+
+        OrderBook orderBook = order.getSecurity().getOrderBook();
+        orderBook.enqueue(order);
+        return MatchResult.executedInAuction();
     }
     // TODO. it has some getter
     private void calculateReopeningPrice() {
