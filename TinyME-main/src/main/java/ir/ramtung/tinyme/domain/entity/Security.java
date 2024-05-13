@@ -1,10 +1,12 @@
 package ir.ramtung.tinyme.domain.entity;
 
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
+import ir.ramtung.tinyme.messaging.request.ChangeMatchingStateRq;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
 import ir.ramtung.tinyme.domain.service.Matcher;
 import ir.ramtung.tinyme.messaging.Message;
+import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Builder;
 import lombok.Getter;
 import org.apache.commons.lang3.ObjectUtils;
@@ -23,7 +25,7 @@ public class Security {
     private OrderBook orderBook = new OrderBook();
     @Builder.Default
     private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
-    // TODO : add matching state and update in each level
+    private MatchingState currentMatchingState; //TODO:: do we need default??
 
     // TODO : check if the matching state is on harraj and the order type doesn't satisfy the process, propagate error.
     // IcebergOrder                             ->  Allowed. same approach for changing priority
@@ -58,6 +60,15 @@ public class Security {
         MatchResult result = matcher.execute(order);
         return result;
     }
+//TODO.
+//    private MatchResult validateOrderType(Order order){
+//        if (order.getMinimumExecutionQuantity() > 0 && currentMatchingState == MatchingState.AUCTION){
+//            return
+//        }
+//        else if (order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
+//            return
+//        }
+//    }
 
     public void deleteOrder(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
@@ -132,4 +143,9 @@ public class Security {
     // this is done by starting a opening operation(?) and notice **matcher** to open:)
     //
     // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement of Event is similar to OrderExecutedEvent to avoid bugs.)
+    public MatchResult updateMatchingState(MatchingState newMatchingState){
+        this.currentMatchingState = newMatchingState;
+        // TODO:: continue when matcher is complete
+        return MatchResult.notEnoughCredit(); //it is dummy. should be fixed later
+    }
 }
