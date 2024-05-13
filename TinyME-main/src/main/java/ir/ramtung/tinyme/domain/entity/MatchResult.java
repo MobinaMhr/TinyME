@@ -40,6 +40,10 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
 
+    public static MatchResult executedInAuction(Order remainder, List<Trade> trades) {
+        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, remainder, new LinkedList<>(trades));
+    }
+
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
         this.remainder = remainder;

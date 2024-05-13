@@ -72,9 +72,67 @@ public class Matcher {
         return MatchResult.executed(newOrder, trades);
     }
     // TODO.
-    public void auctionMatch(Order newOrder) {
-//        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
-//        LinkedList<Trade> trades = new LinkedList<>();
+    public MatchResult auctionMatch(Order newOrder) {
+        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
+        LinkedList<Order> sellQueue = new LinkedList<>();
+        LinkedList<Order> buyQueue = new LinkedList<>();
+        LinkedList<Trade> trades = new LinkedList<>();
+
+
+        for (var order : orderBook.getSellQueue()){
+            if(order.getPrice() >= this.reopeningPrice){
+                orderBook.removeByOrderId(Side.SELL,order.getOrderId());
+                sellQueue.add(order);
+            }
+        }
+
+        for (var order : orderBook.getBuyQueue()){
+            if(order.getPrice() <= this.reopeningPrice){
+                orderBook.removeByOrderId(Side.BUY,order.getOrderId());
+                order.getBroker().increaseCreditBy(order.getValue());
+                buyQueue.add(order);
+            }
+        }
+        Order baseOrder = null;
+        for (var order : buyQueue)
+        {
+            baseOrder = order;
+            while (!sellQueue.isEmpty() && order.getQuantity() > 0) {
+                Order matchingOrder = sellQueue.getFirst();
+
+                Trade trade = new Trade(order.getSecurity(), reopeningPrice, Math.min(order.getQuantity(), matchingOrder.getQuantity()), order, matchingOrder);
+                trade.decreaseBuyersCredit();
+                trade.increaseSellersCredit();
+                trades.add(trade);
+
+                if (newOrder.getQuantity() >= matchingOrder.getQuantity()) {
+                    order.decreaseQuantity(matchingOrder.getQuantity());
+                    sellQueue.remove(matchingOrder);
+                    // TODO::iceberg match needs revision
+//                    if (matchingOrder instanceof IcebergOrder icebergOrder) {
+//                        icebergOrder.decreaseQuantity(matchingOrder.getQuantity());
+//                        icebergOrder.replenish();
+//                        if (icebergOrder.getQuantity() > 0) {
+//                            orderBook.enqueue(icebergOrder);
+//                        }
+//                    }
+                } else {
+                    matchingOrder.decreaseQuantity(order.getQuantity());
+                    order.makeQuantityZero();
+                    buyQueue.remove(order);
+                }
+            }
+        }
+        for (var order : sellQueue){
+            auctionExecute(order);
+        }
+
+        for (var order : buyQueue){
+            auctionExecute(order);
+        }
+
+        return MatchResult.executedInAuction(baseOrder, trades);
+
     }
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
@@ -159,8 +217,26 @@ public class Matcher {
         return MatchResult.executedInAuction();
     }
     // TODO. it has some getter
-    private void calculateReopeningPrice() {
+    private void calculateReopeningPrice(Order order) {
         reopeningPrice = 0;
+        int tradedQuantity = -1;
+        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
+        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
+
+        for (int i=lowestPriceInSellQueue; i<=highestPriceInBuyQueue; i++){
+            int temp = this.reopeningPrice;
+            this.reopeningPrice = i;
+            MatchResult result = auctionMatch(order);
+            if (result.trades().stream().mapToLong(Trade::getQuantity).sum() < tradedQuantity){
+                this.reopeningPrice = temp;
+            }
+            else if (Math.abs(this.reopeningPrice - lastTradePrice) > Math.abs(temp - lastTradePrice)){
+                this.reopeningPrice = temp;
+            }
+            else {
+                this.reopeningPrice = temp;
+            }
+        }
     }
     // TODO : add new method to do bazgoshayii process
     // compute or get the bazgoshayii price
