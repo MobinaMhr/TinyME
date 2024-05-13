@@ -23,6 +23,15 @@ public class Security {
     private OrderBook orderBook = new OrderBook();
     @Builder.Default
     private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
+    // TODO : add matching state and update in each level
+
+    // TODO : check if the matching state is on harraj and the order type doesn't satisfy the process, propagate error.
+    // IcebergOrder                             ->  Allowed. same approach for changing priority
+    // StopLimitOrder                           ->  Not Allowed.
+    // Order with getMinimumExecutionQuantity   ->  Not Allowed.
+    // Order without getMinimumExecutionQuantity   ->  Allowed.
+    // also check for other types of orders which are not mentioned.
+    // If order is accepted, publish <rokhdade paziresh sefaresh>
 
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
@@ -45,6 +54,7 @@ public class Security {
                     enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
 
 
+        // TODO : code for auctionExecute and separate procedure of code for different matching state
         MatchResult result = matcher.execute(order);
         return result;
     }
@@ -118,4 +128,8 @@ public class Security {
         }
         return matchResult;
     }
+    // TODO order handler gives request to change matching state field. add method
+    // this is done by starting a opening operation(?) and notice **matcher** to open:)
+    //
+    // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement of Event is similar to OrderExecutedEvent to avoid bugs.)
 }

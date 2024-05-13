@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class OpeningPriceEvent extends Event {
     private String securityIsin;
     private int openingPrice;
-    private int tradableQuantity;
+    private int tradableQuantity; // TODO : it is about tradable quantity in Goshayesh time(I didn't get it)
 }

@@ -70,6 +70,7 @@ public class Matcher {
         }
         return MatchResult.executed(newOrder, trades);
     }
+    // TODO : add auctionMatch()
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
@@ -131,5 +132,20 @@ public class Matcher {
         updateLastTradePrice(result);
         return result;
     }
+    // TODO : add auctionExecute()
 
+    // TODO : add new method to do bazgoshayii process
+    // compute or get the bazgoshayii price
+    // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
+    // find orders which could participate in some trades with this price (satisfication)
+    // enter in Trades queue (I'm not sure find in code) sequentially.
+    // call auctionMatch on trade queue so auctionExecute will be called too.
+    // untill one queue became empty.
+    // enter remaining orders from trade queue to orderbook. sequentially
+    // after match give or get difference between bazgoshayii price and the price they've paid..
+
+
+
+    // TODO : add calculator for bazgoshayii price
+    // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
 }
