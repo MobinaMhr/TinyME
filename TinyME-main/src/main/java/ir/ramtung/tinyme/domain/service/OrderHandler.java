@@ -6,6 +6,7 @@ import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
 import ir.ramtung.tinyme.messaging.EventPublisher;
 import ir.ramtung.tinyme.messaging.TradeDTO;
 import ir.ramtung.tinyme.messaging.event.*;
+import ir.ramtung.tinyme.messaging.request.ChangeMatchingStateRq;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
 import ir.ramtung.tinyme.messaging.request.OrderEntryType;
@@ -89,6 +90,19 @@ public class OrderHandler {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
         }
     }
+    public void handleChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) {
+        try {
+            validateChangeMatchingStateRq(changeMatchingStateRq);
+
+            Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
+            security.updateMatchingState(changeMatchingStateRq.getTargetState());
+            // TODO : MatchResult is output and handle the errors
+            // handle change matching state request and notice the security to change
+        } catch (InvalidRequestException ex) {
+            eventPublisher.publish(new ChangeMatchingStateRqRejectedEvent(
+                    changeMatchingStateRq.getSecurityIsin(), changeMatchingStateRq.getTargetState()));
+        }
+    }
 
     public void executeActivatedSLO(EnterOrderRq enterOrderRq, Security security){
         StopLimitOrder orderUnderActivation = security.getInactiveOrderBook().getActivateCandidateOrders(matcher.getLastTradePrice());
@@ -159,6 +173,19 @@ public class OrderHandler {
             throw new InvalidRequestException(errors);
     }
 
+
+    private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) throws InvalidRequestException {
+        changeMatchingStateRq.getTargetState();// TODO.hadle errors related to getTargetState
+        //
+        List<String> errors = new LinkedList<>();
+
+        Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
+        if (security == null)
+            errors.add(Message.UNKNOWN_SECURITY_ISIN);
+        if (!errors.isEmpty())
+            throw new InvalidRequestException(errors);
+    }
+
     private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
 
@@ -174,6 +201,4 @@ public class OrderHandler {
             throw new InvalidRequestException(errors);
         }
     }
-    // TODO : handle change matching state request and notice the security to change
-    // This is done with opening process (?)
 }

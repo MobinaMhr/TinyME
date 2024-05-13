@@ -11,6 +11,7 @@ import java.util.ListIterator;
 @Service
 public class Matcher {
     private int lastTradePrice;
+    private int reopeningPrice;
 
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) {
@@ -70,7 +71,11 @@ public class Matcher {
         }
         return MatchResult.executed(newOrder, trades);
     }
-    // TODO : add auctionMatch()
+    // TODO.
+    public void auctionMatch(Order newOrder) {
+//        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
+//        LinkedList<Trade> trades = new LinkedList<>();
+    }
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
@@ -132,8 +137,21 @@ public class Matcher {
         updateLastTradePrice(result);
         return result;
     }
-    // TODO : add auctionExecute()
-
+    // TODO.
+    public void auctionExecute(Order order) {
+        if (order instanceof StopLimitOrder stopLimitOrder) {
+            //
+        }
+        else if (order instanceof IcebergOrder icebergOrder) {
+            //
+        }
+        // check for other types of order.
+        // Add to order book.
+    }
+    // TODO. it has some getter
+    private void calculateReopeningPrice() {
+        reopeningPrice = 0;
+    }
     // TODO : add new method to do bazgoshayii process
     // compute or get the bazgoshayii price
     // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
@@ -143,9 +161,5 @@ public class Matcher {
     // untill one queue became empty.
     // enter remaining orders from trade queue to orderbook. sequentially
     // after match give or get difference between bazgoshayii price and the price they've paid..
-
-
-
-    // TODO : add calculator for bazgoshayii price
     // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
 }
