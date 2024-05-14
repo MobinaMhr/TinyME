@@ -94,6 +94,28 @@ public class Matcher {
         return tradableQuantityBuy;
     }
     private int calculateReopeningPrice(OrderBook orderBook) {
+    // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
+    // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
+
+    private int checkSellQueue(int buyPrice, LinkedList<Order> sellQueue){
+        int tradableQuantitySell = 0;
+        for(Order sellOrder: sellQueue){
+            if(sellOrder.getPrice() > buyPrice)
+                break;
+            tradableQuantitySell += sellOrder.getTotalQuantity();
+        }
+        return tradableQuantitySell;
+    }
+    private int checkBuyQueue(int sellPrice, LinkedList<Order> buyQueue){
+        int tradableQuantityBuy = 0;
+        for(Order buyOrder:buyQueue){
+            if(sellPrice > buyOrder.getPrice())
+                break;
+            tradableQuantityBuy += buyOrder.getTotalQuantity();
+        }
+        return tradableQuantityBuy;
+    }
+    private int calculateReopeningPrice(OrderBook orderBook) {
         int reopeningPrice = 0;
         int tradableQuantity = 0;
         int maxQuantity = 0;
@@ -138,6 +160,14 @@ public class Matcher {
 
 //        int lowestPrice = Math.min(0, 1); // Temporary
 //        int highestPrice = Math.min(0, 1); // Temporary
+        int maxQuantityWithLastPrice = Math.min(checkSellQueue(lastTradePrice, orderBook.getBuyQueue()),
+                                                    checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
+        if(maxQuantityWithLastPrice == maxQuantity)
+            reopeningPrice = lastTradePrice;
+        return reopeningPrice;
+
+//        int lowestPrice = Math.min(0, 1); // Temporary
+//        int highestPrice = Math.min(0, 1); // Temporary
 //        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
 //        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
 //        for (int price = lowestPrice; price <= highestPrice; price++) {
@@ -148,6 +178,8 @@ public class Matcher {
 //                this.reopeningPrice = temp;
 //        return reopeningPrice;
         }
+//        return reopeningPrice;
+    }
 
     public static MatchResult auctionMatch(OrderBook orderBook) {
         int reopeningPrice = calculateReopeningPrice(orderBook);
