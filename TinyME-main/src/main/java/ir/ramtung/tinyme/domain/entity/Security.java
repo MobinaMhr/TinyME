@@ -147,8 +147,7 @@ public class Security {
     }
 
     public MatchResult updateMatchingState(MatchingState newMatchingState) {
-        if (this.currentMatchingState == MatchingState.AUCTION
-                && newMatchingState == MatchingState.CONTINUOUS) {
+        if (this.currentMatchingState == MatchingState.AUCTION) {
             Matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
