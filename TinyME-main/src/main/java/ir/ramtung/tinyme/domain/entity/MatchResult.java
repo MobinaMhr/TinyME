@@ -40,6 +40,7 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
 
+    // TODO -> added by mahdi(IDK).
     public static MatchResult executedInAuction(Order remainder, List<Trade> trades) {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, remainder, new LinkedList<>(trades));
     }

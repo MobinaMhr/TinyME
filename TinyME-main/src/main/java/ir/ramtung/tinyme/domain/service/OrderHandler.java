@@ -96,6 +96,7 @@ public class OrderHandler {
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
             MatchResult matchResult = security.updateMatchingState(changeMatchingStateRq.getTargetState());
+
             // TODO : MatchResult is output and handle the errors
             // handle change matching state request and notice the security to change
         } catch (InvalidRequestException ex) {

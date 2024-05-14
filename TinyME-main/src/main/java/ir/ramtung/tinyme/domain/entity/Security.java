@@ -25,6 +25,7 @@ public class Security {
     private OrderBook orderBook = new OrderBook();
     @Builder.Default
     private InactiveOrderBook inactiveOrderBook = new InactiveOrderBook();
+    @Builder.Default
     private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
     // TODO : check if the matching state is on harraj and the order type doesn't satisfy the process, propagate error.
@@ -59,7 +60,8 @@ public class Security {
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            result = matcher.auctionExecute(order);
+//            result = matcher.auctionExecute(order);
+            result = Matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
         }
@@ -136,12 +138,15 @@ public class Security {
         return matchResult;
     }
     // TODO order handler gives request to change matching state field. add method
-    // this is done by starting a opening operation(?) and notice **matcher** to open:)
-    //
-    // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement of Event is similar to OrderExecutedEvent to avoid bugs.)
-    public MatchResult updateMatchingState(MatchingState newMatchingState){
+    // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement
+    // of Event is similar to OrderExecutedEvent to avoid bugs.)
+    public MatchResult updateMatchingState(MatchingState newMatchingState) {
+        if (this.currentMatchingState == MatchingState.AUCTION
+                && newMatchingState == MatchingState.CONTINUOUS) {
+            return Matcher.auctionMatch(this.orderBook);
+        }
+        // other conditions? error or what?
         this.currentMatchingState = newMatchingState;
-        // TODO:: continue when matcher is complete
-        return MatchResult.notEnoughCredit(); //it is dummy. should be fixed later
+        return MatchResult.executedInAuction();
     }
 }

@@ -11,7 +11,6 @@ import java.util.ListIterator;
 @Service
 public class Matcher {
     private int lastTradePrice;
-    private int reopeningPrice;
 
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) {
@@ -71,58 +70,81 @@ public class Matcher {
         }
         return MatchResult.executed(newOrder, trades);
     }
-    // TODO.
-    public MatchResult auctionMatch(Order newOrder) {
-        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
+
+    // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
+    // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
+    private static int calculateReopeningPrice(OrderBook orderBook) {
+        int reopeningPrice = 0;
+        int tradableQuantity = 0;
+
+        int lowestPrice = Math.min(0, 1); // Temporary
+        int highestPrice = Math.min(0, 1); // Temporary
+//        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
+//        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
+        for (int price = lowestPrice; price <= highestPrice; price++) {
+//            int temp = this.reopeningPrice;
+//            this.reopeningPrice = i;
+//            MatchResult result = auctionMatch(order);
+//            if (result.trades().stream().mapToLong(Trade::getQuantity).sum() < tradedQuantity)
+//                this.reopeningPrice = temp;
+//            else if (Math.abs(this.reopeningPrice - lastTradePrice) > Math.abs(temp - lastTradePrice))
+//                this.reopeningPrice = temp;
+//            else
+//                this.reopeningPrice = temp;
+        }
+        return reopeningPrice;
+    }
+
+    public static MatchResult auctionMatch(OrderBook orderBook) {
+        int reopeningPrice = calculateReopeningPrice(orderBook);
+
         LinkedList<Order> sellQueue = new LinkedList<>();
+        for (var order : orderBook.getSellQueue()) {
+            if (reopeningPrice < order.getPrice())
+                continue;
+            orderBook.removeByOrderId(Side.SELL, order.getOrderId());//TODO:will it remove from global orderbook?
+            sellQueue.add(order);
+        }
+
         LinkedList<Order> buyQueue = new LinkedList<>();
+        for (var order : orderBook.getBuyQueue()) {
+            if (reopeningPrice > order.getPrice())
+                continue;
+            orderBook.removeByOrderId(Side.BUY, order.getOrderId());
+            buyQueue.add(order);
+        }
+
         LinkedList<Trade> trades = new LinkedList<>();
-
-
-        for (var order : orderBook.getSellQueue()){
-            if(order.getPrice() >= this.reopeningPrice){
-                orderBook.removeByOrderId(Side.SELL,order.getOrderId());
-                sellQueue.add(order);
-            }
-        }
-
-        for (var order : orderBook.getBuyQueue()){
-            if(order.getPrice() <= this.reopeningPrice){
-                orderBook.removeByOrderId(Side.BUY,order.getOrderId());
-                order.getBroker().increaseCreditBy(order.getValue());
-                buyQueue.add(order);
-            }
-        }
-        Order baseOrder = null;
-        for (var order : buyQueue)
-        {
-            baseOrder = order;
-            while (!sellQueue.isEmpty() && order.getQuantity() > 0) {
-                Order matchingOrder = sellQueue.getFirst();
-
-                Trade trade = new Trade(order.getSecurity(), reopeningPrice, Math.min(order.getQuantity(), matchingOrder.getQuantity()), order, matchingOrder);
+        for (var buyOrder : buyQueue) {
+            while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
+                Order matchingSellOrder = sellQueue.getFirst();
+                Trade trade = new Trade(buyOrder.getSecurity(), reopeningPrice, Math.min(buyOrder.getQuantity(),
+                        matchingSellOrder.getQuantity()), buyOrder, matchingSellOrder);
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
                 trades.add(trade);
 
-                if (newOrder.getQuantity() >= matchingOrder.getQuantity()) {
-                    order.decreaseQuantity(matchingOrder.getQuantity());
-                    sellQueue.remove(matchingOrder);
-                    // TODO::iceberg match needs revision
-//                    if (matchingOrder instanceof IcebergOrder icebergOrder) {
-//                        icebergOrder.decreaseQuantity(matchingOrder.getQuantity());
-//                        icebergOrder.replenish();
-//                        if (icebergOrder.getQuantity() > 0) {
-//                            orderBook.enqueue(icebergOrder);
-//                        }
-//                    }
-                } else {
-                    matchingOrder.decreaseQuantity(order.getQuantity());
-                    order.makeQuantityZero();
-                    buyQueue.remove(order);
+                // Add credit so in auctionExecute the new value will be decreased from buyOrder:>
+                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
+
+                if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
+                    buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
+                    sellQueue.remove(matchingSellOrder);
+                } else if (buyOrder.getQuantity() == matchingSellOrder.getQuantity()) {
+                    buyOrder.makeQuantityZero();
+                    buyQueue.remove(buyOrder);
+
+                    matchingSellOrder.makeQuantityZero();
+                    sellQueue.remove(matchingSellOrder);
+                } else { // buyOrder.getQuantity() < matchingSellOrder.getQuantity()
+                    matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
+                    buyQueue.remove(buyOrder);
                 }
             }
         }
+
+        // Make sure this is global OrderBook. I mean in this method we removed these orders from orderBook,
+        // are they really removed???? if you didn't get, contact me(Mobina).
         for (var order : sellQueue){
             auctionExecute(order);
         }
@@ -131,8 +153,10 @@ public class Matcher {
             auctionExecute(order);
         }
 
-        return MatchResult.executedInAuction(baseOrder, trades);
-
+//        MatchResult result = null;
+//        return result;
+//        return MatchResult.executedInAuction(baseOrder, trades);
+        return MatchResult.executedInAuction(); //TODO
     }
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
@@ -195,7 +219,7 @@ public class Matcher {
         updateLastTradePrice(result);
         return result;
     }
-    public MatchResult auctionExecute(Order order) {
+    public static MatchResult auctionExecute(Order order) {
         if (order instanceof StopLimitOrder stopLimitOrder) {
             return MatchResult.stopLimitOrderIsNotAllowedInAuction();
         }
@@ -205,47 +229,14 @@ public class Matcher {
         // check for other types of order.TODO.
 
         if (order.getSide() == Side.BUY) {
-            if (order.getBroker().getCredit() >= order.getValue())
-                order.getBroker().decreaseCreditBy(order.getValue());
-            else {
+            if (order.getBroker().getCredit() < order.getValue())
                 return MatchResult.notEnoughCredit();
-            }
+            order.getBroker().decreaseCreditBy(order.getValue());
         }
 
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
+
         return MatchResult.executedInAuction();
     }
-    // TODO. it has some getter
-    private void calculateReopeningPrice(Order order) {
-        reopeningPrice = 0;
-        int tradedQuantity = -1;
-        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
-        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
-
-        for (int i=lowestPriceInSellQueue; i<=highestPriceInBuyQueue; i++){
-            int temp = this.reopeningPrice;
-            this.reopeningPrice = i;
-            MatchResult result = auctionMatch(order);
-            if (result.trades().stream().mapToLong(Trade::getQuantity).sum() < tradedQuantity){
-                this.reopeningPrice = temp;
-            }
-            else if (Math.abs(this.reopeningPrice - lastTradePrice) > Math.abs(temp - lastTradePrice)){
-                this.reopeningPrice = temp;
-            }
-            else {
-                this.reopeningPrice = temp;
-            }
-        }
-    }
-    // TODO : add new method to do bazgoshayii process
-    // compute or get the bazgoshayii price
-    // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
-    // find orders which could participate in some trades with this price (satisfication)
-    // enter in Trades queue (I'm not sure find in code) sequentially.
-    // call auctionMatch on trade queue so auctionExecute will be called too.
-    // untill one queue became empty.
-    // enter remaining orders from trade queue to orderbook. sequentially
-    // after match give or get difference between bazgoshayii price and the price they've paid..
-    // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
 }
