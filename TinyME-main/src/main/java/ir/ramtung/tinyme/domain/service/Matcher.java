@@ -72,45 +72,82 @@ public class Matcher {
         return MatchResult.executed(newOrder, trades);
     }
 
-    // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
-    // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
-    private static int calculateReopeningPrice(OrderBook orderBook) {
-        int reopeningPrice = 0;
-        int tradableQuantity = 0;
-
-        int lowestPrice = Math.min(0, 1); // Temporary
-        int highestPrice = Math.min(0, 1); // Temporary
-//        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
-//        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
-        for (int price = lowestPrice; price <= highestPrice; price++) {
-//            int temp = this.reopeningPrice;
-//            this.reopeningPrice = i;
-//            MatchResult result = auctionMatch(order);
-//            if (result.trades().stream().mapToLong(Trade::getQuantity).sum() < tradedQuantity)
-//                this.reopeningPrice = temp;
-//            else if (Math.abs(this.reopeningPrice - lastTradePrice) > Math.abs(temp - lastTradePrice))
-//                this.reopeningPrice = temp;
-//            else
-//                this.reopeningPrice = temp;
+    private int checkSellQueue(int buyPrice, LinkedList<Order> sellQueue){
+        int tradableQuantitySell = 0;
+        for(Order sellOrder: sellQueue){
+            if(sellOrder.getPrice() > buyPrice)
+                break;
+            tradableQuantitySell += sellOrder.getTotalQuantity();
         }
-        return reopeningPrice;
+        return tradableQuantitySell;
     }
 
-    public static MatchResult auctionMatch(OrderBook orderBook) {
-        int reopeningPrice = calculateReopeningPrice(orderBook);
-        // Remove this and get from attributes because new event should not be published
+    private int checkBuyQueue(int sellPrice, LinkedList<Order> buyQueue){
+        int tradableQuantityBuy = 0;
+        for(Order buyOrder:buyQueue){
+            if(sellPrice > buyOrder.getPrice())
+                break;
+            tradableQuantityBuy += buyOrder.getTotalQuantity();
+        }
+        return tradableQuantityBuy;
+    }
 
+    private void calculateReopeningPrice(OrderBook orderBook) {
+        this.reopeningPrice = 0;
+        this.tradableQuantity = 0;
+        int maxQuantity = 0;
+
+        for(Order buyOrder: orderBook.getBuyQueue()){
+            this.tradableQuantity += buyOrder.getTotalQuantity();
+            int tradableQuantitySell = checkSellQueue(buyOrder.getPrice(), orderBook.getSellQueue());
+            int exchangedQuantity = Math.min(tradableQuantitySell, this.tradableQuantity);
+            if(exchangedQuantity > maxQuantity){
+                this.reopeningPrice = buyOrder.getPrice();
+                maxQuantity = exchangedQuantity;
+            } else if (exchangedQuantity == maxQuantity){
+                if(Math.abs(lastTradePrice - this.reopeningPrice) > Math.abs(lastTradePrice - buyOrder.getPrice())) {
+                    this.reopeningPrice = buyOrder.getPrice();
+                } else if (Math.abs(lastTradePrice - this.reopeningPrice) == Math.abs(lastTradePrice - buyOrder.getPrice())) {
+                    this.reopeningPrice = Math.min(this.reopeningPrice, buyOrder.getPrice());
+                }
+            }
+        }
+        this.tradableQuantity = 0;
+        for(Order sellOrder:orderBook.getSellQueue()){
+            this.tradableQuantity += sellOrder.getTotalQuantity();
+            int tradableQuantityBuy = checkBuyQueue(sellOrder.getPrice(), orderBook.getBuyQueue());
+            int exchangedQuantity = Math.min(tradableQuantityBuy, this.tradableQuantity);
+            if(exchangedQuantity > maxQuantity){
+                this.reopeningPrice = sellOrder.getPrice();
+                maxQuantity = exchangedQuantity;
+            }else if(exchangedQuantity == maxQuantity){
+                if(Math.abs(lastTradePrice - this.reopeningPrice) > Math.abs(lastTradePrice - sellOrder.getPrice())){
+                    this.reopeningPrice = sellOrder.getPrice();
+                } else if(Math.abs(lastTradePrice - this.reopeningPrice) == Math.abs(lastTradePrice - sellOrder.getPrice())){
+                    this.reopeningPrice = Math.min(this.reopeningPrice, sellOrder.getPrice());
+                }
+            }
+        }
+
+        int maxQuantityWithLastPrice = Math.min(checkSellQueue(lastTradePrice, orderBook.getBuyQueue()),
+                checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
+        if(maxQuantityWithLastPrice == maxQuantity)
+            this.reopeningPrice = lastTradePrice;
+    }
+
+    public MatchResult auctionMatch(OrderBook orderBook) {
         LinkedList<Order> sellQueue = new LinkedList<>();
         for (var order : orderBook.getSellQueue()) {
-            if (reopeningPrice < order.getPrice())
+            if (this.reopeningPrice < order.getPrice())
                 continue;
-            orderBook.removeByOrderId(Side.SELL, order.getOrderId());//TODO:will it remove from global orderbook?
+            orderBook.removeByOrderId(Side.SELL, order.getOrderId());
+            //TODO : will it remove from global orderbook?
             sellQueue.add(order);
         }
 
         LinkedList<Order> buyQueue = new LinkedList<>();
         for (var order : orderBook.getBuyQueue()) {
-            if (reopeningPrice > order.getPrice())
+            if (this.reopeningPrice > order.getPrice())
                 continue;
             orderBook.removeByOrderId(Side.BUY, order.getOrderId());
             buyQueue.add(order);
@@ -121,7 +158,7 @@ public class Matcher {
         for (var buyOrder : buyQueue) {
             while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
                 Order matchingSellOrder = sellQueue.getFirst();
-                Trade trade = new Trade(buyOrder.getSecurity(), reopeningPrice, Math.min(buyOrder.getQuantity(),
+                Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice, Math.min(buyOrder.getQuantity(),
                         matchingSellOrder.getQuantity()), buyOrder, matchingSellOrder);
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
@@ -147,10 +184,6 @@ public class Matcher {
             tradePair.add(Map.entry(buyOrder, trades));
         }
 
-        for (Trade trade : trades) {
-            // craete new event publisher for TradeEvent
-        }
-
         // Make sure this is global OrderBook. I mean in this method we removed these orders from orderBook,
         // are they really removed???? if you didn't get, contact me(Mobina).
         for (var order : sellQueue){
@@ -161,13 +194,9 @@ public class Matcher {
             auctionExecute(order);
         }
 
-//        MatchResult result = null;
-//        return result;
-//        return MatchResult.executedInAuction(baseOrder, trades);
         MatchResult.executedInAuction(tradePair);
-        return MatchResult.executedInAuction(); //TODO
+        return MatchResult.executedInAuction();
     }
-//    LinkedList<MatchResult> executedInAuction
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
@@ -229,14 +258,14 @@ public class Matcher {
         updateLastTradePrice(result);
         return result;
     }
-    public static MatchResult auctionExecute(Order order) {
+    public MatchResult auctionExecute(Order order) {
         if (order instanceof StopLimitOrder stopLimitOrder) {
             return MatchResult.stopLimitOrderIsNotAllowedInAuction();
         }
         if (order.getMinimumExecutionQuantity() > 0) {
             return MatchResult.meqOrderIsNotAllowedInAuction();
         }
-        // check for other types of order.TODO.
+        // TODO : check for other types of order.
 
         if (order.getSide() == Side.BUY) {
             if (order.getBroker().getCredit() < order.getValue())

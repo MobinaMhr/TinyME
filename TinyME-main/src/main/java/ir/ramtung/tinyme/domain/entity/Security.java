@@ -29,14 +29,6 @@ public class Security {
     @Builder.Default
     private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
-    // TODO : check if the matching state is on harraj and the order type doesn't satisfy the process, propagate error.
-    // IcebergOrder                             ->  Allowed. same approach for changing priority
-    // StopLimitOrder                           ->  Not Allowed.
-    // Order with getMinimumExecutionQuantity   ->  Not Allowed.
-    // Order without getMinimumExecutionQuantity   ->  Allowed.
-    // also check for other types of orders which are not mentioned.
-    // If order is accepted, publish <rokhdade paziresh sefaresh>
-
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
@@ -61,7 +53,7 @@ public class Security {
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            result = Matcher.auctionExecute(order);
+            result = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
         }
@@ -131,7 +123,7 @@ public class Security {
 
         MatchResult matchResult = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            matchResult = Matcher.auctionExecute(order);
+            matchResult = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             matchResult = matcher.execute(order);
         }
@@ -146,9 +138,9 @@ public class Security {
         return matchResult;
     }
 
-    public MatchResult updateMatchingState(MatchingState newMatchingState) {
+    public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
         if (this.currentMatchingState == MatchingState.AUCTION) {
-            return Matcher.auctionMatch(this.orderBook);
+            return matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
         this.currentMatchingState = newMatchingState;

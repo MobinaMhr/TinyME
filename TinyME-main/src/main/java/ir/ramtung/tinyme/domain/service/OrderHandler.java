@@ -98,7 +98,7 @@ public class OrderHandler {
             validateChangeMatchingStateRq(changeMatchingStateRq);
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-            MatchResult matchResult = security.updateMatchingState(changeMatchingStateRq.getTargetState());
+            MatchResult matchResult = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
 
             if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
                 eventPublisher.publish(new SecurityStateChangedEvent(changeMatchingStateRq.getSecurityIsin(),
