@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.apache.commons.lang3.ObjectUtils;
 
+import java.util.LinkedList;
 import java.util.List;
 
 @Getter
@@ -60,7 +61,6 @@ public class Security {
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-//            result = matcher.auctionExecute(order);
             result = Matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
@@ -128,8 +128,16 @@ public class Security {
 
         orderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-        MatchResult matchResult = matcher.execute(order);
+
+        MatchResult matchResult = null;
+        if (currentMatchingState == MatchingState.AUCTION) {
+            matchResult = Matcher.auctionExecute(order);
+        } else if (currentMatchingState == MatchingState.CONTINUOUS) {
+            matchResult = matcher.execute(order);
+        }
+
         if (matchResult.outcome() != MatchingOutcome.EXECUTED && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
+            //TODO: would be involved in new project?
             orderBook.enqueue(originalOrder);
             if (updateOrderRq.getSide() == Side.BUY) {
                 originalOrder.getBroker().decreaseCreditBy(originalOrder.getValue());
@@ -137,16 +145,14 @@ public class Security {
         }
         return matchResult;
     }
-    // TODO order handler gives request to change matching state field. add method
-    // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement
-    // of Event is similar to OrderExecutedEvent to avoid bugs.)
+
     public MatchResult updateMatchingState(MatchingState newMatchingState) {
         if (this.currentMatchingState == MatchingState.AUCTION
                 && newMatchingState == MatchingState.CONTINUOUS) {
-            return Matcher.auctionMatch(this.orderBook);
+            Matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
         this.currentMatchingState = newMatchingState;
-        return MatchResult.executedInAuction();
+        return MatchResult.executedInAuction(); //TODO
     }
 }

@@ -4,13 +4,14 @@ import ir.ramtung.tinyme.domain.entity.*;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
-import java.util.LinkedList;
-import java.util.ListIterator;
+import java.util.*;
 
 @Getter
 @Service
 public class Matcher {
     private int lastTradePrice;
+    public int reopeningPrice = -1;//Default value
+    public int tradableQuantity = -1; //Default value
 
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) {
@@ -97,6 +98,7 @@ public class Matcher {
 
     public static MatchResult auctionMatch(OrderBook orderBook) {
         int reopeningPrice = calculateReopeningPrice(orderBook);
+        // Remove this and get from attributes because new event should not be published
 
         LinkedList<Order> sellQueue = new LinkedList<>();
         for (var order : orderBook.getSellQueue()) {
@@ -114,6 +116,7 @@ public class Matcher {
             buyQueue.add(order);
         }
 
+        List<Map.Entry<Order, LinkedList<Trade>>> tradePair = new ArrayList<>();
         LinkedList<Trade> trades = new LinkedList<>();
         for (var buyOrder : buyQueue) {
             while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
@@ -141,6 +144,11 @@ public class Matcher {
                     buyQueue.remove(buyOrder);
                 }
             }
+            tradePair.add(Map.entry(buyOrder, trades));
+        }
+
+        for (Trade trade : trades) {
+            // craete new event publisher for TradeEvent
         }
 
         // Make sure this is global OrderBook. I mean in this method we removed these orders from orderBook,
@@ -156,8 +164,10 @@ public class Matcher {
 //        MatchResult result = null;
 //        return result;
 //        return MatchResult.executedInAuction(baseOrder, trades);
+        MatchResult.executedInAuction(tradePair);
         return MatchResult.executedInAuction(); //TODO
     }
+//    LinkedList<MatchResult> executedInAuction
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
@@ -236,6 +246,8 @@ public class Matcher {
 
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
+
+        calculateReopeningPrice(orderBook);
 
         return MatchResult.executedInAuction();
     }
