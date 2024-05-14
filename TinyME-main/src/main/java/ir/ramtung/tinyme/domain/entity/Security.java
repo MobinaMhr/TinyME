@@ -141,8 +141,7 @@ public class Security {
     // publish some set of TradeEvent (previously it was OrderExecutedEvent, so you can check playcement
     // of Event is similar to OrderExecutedEvent to avoid bugs.)
     public MatchResult updateMatchingState(MatchingState newMatchingState) {
-        if (this.currentMatchingState == MatchingState.AUCTION
-                && newMatchingState == MatchingState.CONTINUOUS) {
+        if (this.currentMatchingState == MatchingState.AUCTION) {
             return Matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
