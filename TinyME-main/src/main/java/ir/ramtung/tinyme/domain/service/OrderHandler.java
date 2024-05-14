@@ -194,13 +194,15 @@ public class OrderHandler {
 
     private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
-
         Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-        if (security == null)
-            errors.add(Message.UNKNOWN_SECURITY_ISIN);
 
-        if (!errors.isEmpty())
+        if (security == null) {
+            errors.add(Message.UNKNOWN_SECURITY_ISIN);
+        }
+
+        if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
+        }
     }
 
     private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
