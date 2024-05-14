@@ -4,10 +4,7 @@ import ir.ramtung.tinyme.domain.entity.*;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.ListIterator;
+import java.util.*;
 
 @Getter
 @Service
@@ -75,110 +72,28 @@ public class Matcher {
         return MatchResult.executed(newOrder, trades);
     }
 
-    private int checkSellQueue(int buyPrice, LinkedList<Order> sellQueue){
-        int tradableQuantitySell = 0;
-        for(Order sellOrder: sellQueue){
-            if(sellOrder.getPrice() > buyPrice)
-                break;
-            tradableQuantitySell += sellOrder.getTotalQuantity();
-        }
-        return tradableQuantitySell;
-    }
-    private int checkBuyQueue(int sellPrice, LinkedList<Order> buyQueue){
-        int tradableQuantityBuy = 0;
-        for(Order buyOrder:buyQueue){
-            if(sellPrice > buyOrder.getPrice())
-                break;
-            tradableQuantityBuy += buyOrder.getTotalQuantity();
-        }
-        return tradableQuantityBuy;
-    }
-    private int calculateReopeningPrice(OrderBook orderBook) {
     // for IcebergeOrder, you should mention all quantity to take rule, not the displayed quantity.
     // *** This price should participate in a rokhdade gheimate bazgoshayii (maybe somewhere else, may not.)
-
-    private int checkSellQueue(int buyPrice, LinkedList<Order> sellQueue){
-        int tradableQuantitySell = 0;
-        for(Order sellOrder: sellQueue){
-            if(sellOrder.getPrice() > buyPrice)
-                break;
-            tradableQuantitySell += sellOrder.getTotalQuantity();
-        }
-        return tradableQuantitySell;
-    }
-    private int checkBuyQueue(int sellPrice, LinkedList<Order> buyQueue){
-        int tradableQuantityBuy = 0;
-        for(Order buyOrder:buyQueue){
-            if(sellPrice > buyOrder.getPrice())
-                break;
-            tradableQuantityBuy += buyOrder.getTotalQuantity();
-        }
-        return tradableQuantityBuy;
-    }
-    private int calculateReopeningPrice(OrderBook orderBook) {
+    private static int calculateReopeningPrice(OrderBook orderBook) {
         int reopeningPrice = 0;
         int tradableQuantity = 0;
-        int maxQuantity = 0;
 
-        for(Order buyOrder: orderBook.getBuyQueue()){
-            tradableQuantity += buyOrder.getTotalQuantity();
-            int tradableQuantitySell = checkSellQueue(buyOrder.getPrice(), orderBook.getSellQueue());
-            int exchangedQuantity = Math.min(tradableQuantitySell, tradableQuantity);
-            if(exchangedQuantity > maxQuantity){
-                reopeningPrice = buyOrder.getPrice();
-                maxQuantity = exchangedQuantity;
-            } else if (exchangedQuantity == maxQuantity){
-                if(Math.abs(lastTradePrice - reopeningPrice) > Math.abs(lastTradePrice - buyOrder.getPrice())) {
-                    reopeningPrice = buyOrder.getPrice();
-                } else if (Math.abs(lastTradePrice - reopeningPrice) == Math.abs(lastTradePrice - buyOrder.getPrice())) {
-                    reopeningPrice = Math.min(reopeningPrice, buyOrder.getPrice());
-                }
-            }
-        }
-        tradableQuantity = 0;
-        for(Order sellOrder:orderBook.getSellQueue()){
-            tradableQuantity += sellOrder.getTotalQuantity();
-            int tradableQuantityBuy = checkBuyQueue(sellOrder.getPrice(), orderBook.getBuyQueue());
-            int exchangedQuantity = Math.min(tradableQuantityBuy, tradableQuantity);
-            if(exchangedQuantity > maxQuantity){
-                reopeningPrice = sellOrder.getPrice();
-                maxQuantity = exchangedQuantity;
-            }else if(exchangedQuantity == maxQuantity){
-                if(Math.abs(lastTradePrice - reopeningPrice) > Math.abs(lastTradePrice - sellOrder.getPrice())){
-                    reopeningPrice = sellOrder.getPrice();
-                } else if(Math.abs(lastTradePrice - reopeningPrice) == Math.abs(lastTradePrice - sellOrder.getPrice())){
-                    reopeningPrice = Math.min(reopeningPrice, sellOrder.getPrice());
-                }
-            }
-        }
-
-        int maxQuantityWithLastPrice = Math.min(checkSellQueue(lastTradePrice, orderBook.getBuyQueue()),
-                checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
-        if(maxQuantityWithLastPrice == maxQuantity)
-            reopeningPrice = lastTradePrice;
-        return reopeningPrice;
-
-//        int lowestPrice = Math.min(0, 1); // Temporary
-//        int highestPrice = Math.min(0, 1); // Temporary
-        int maxQuantityWithLastPrice = Math.min(checkSellQueue(lastTradePrice, orderBook.getBuyQueue()),
-                                                    checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
-        if(maxQuantityWithLastPrice == maxQuantity)
-            reopeningPrice = lastTradePrice;
-        return reopeningPrice;
-
-//        int lowestPrice = Math.min(0, 1); // Temporary
-//        int highestPrice = Math.min(0, 1); // Temporary
+        int lowestPrice = Math.min(0, 1); // Temporary
+        int highestPrice = Math.min(0, 1); // Temporary
 //        int lowestPriceInSellQueue = order.getSecurity().getOrderBook().getSellQueue().getLast().getPrice();
 //        int highestPriceInBuyQueue = order.getSecurity().getOrderBook().getBuyQueue().getLast().getPrice();
-//        for (int price = lowestPrice; price <= highestPrice; price++) {
+        for (int price = lowestPrice; price <= highestPrice; price++) {
 //            int temp = this.reopeningPrice;
 //            this.reopeningPrice = i;
 //            MatchResult result = auctionMatch(order);
+//            if (result.trades().stream().mapToLong(Trade::getQuantity).sum() < tradedQuantity)
+//                this.reopeningPrice = temp;
+//            else if (Math.abs(this.reopeningPrice - lastTradePrice) > Math.abs(temp - lastTradePrice))
+//                this.reopeningPrice = temp;
 //            else
 //                this.reopeningPrice = temp;
-//        return reopeningPrice;
         }
-//        return reopeningPrice;
+        return reopeningPrice;
     }
 
     public static MatchResult auctionMatch(OrderBook orderBook) {
@@ -289,7 +204,7 @@ public class Matcher {
                 order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
             return result;
         }
-        
+
         if (order.getStatus() == OrderStatus.NEW && !isMEQFilterPassedBy(result.remainder(), prevQuantity)){
             rollbackTrades(order, result.trades());
             return MatchResult.notMetMEQValue();
