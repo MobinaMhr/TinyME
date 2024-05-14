@@ -148,10 +148,10 @@ public class Security {
 
     public MatchResult updateMatchingState(MatchingState newMatchingState) {
         if (this.currentMatchingState == MatchingState.AUCTION) {
-            Matcher.auctionMatch(this.orderBook);
+            return Matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
         this.currentMatchingState = newMatchingState;
-        return MatchResult.executedInAuction(); //TODO
+        return MatchResult.executedInAuction();
     }
 }
