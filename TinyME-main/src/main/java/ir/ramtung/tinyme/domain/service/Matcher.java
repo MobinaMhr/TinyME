@@ -173,21 +173,33 @@ public class Matcher {
                         matchingSellOrder instanceof IcebergOrder sellIOrder) {
                     tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), sellIOrder.getDisplayedQuantity());
                     buyIOrder.decreaseQuantity(tradedQuantity);
-                    buyIOrder.replenish();
+                    if (buyIOrder.getDisplayedQuantity() == 0) {
+                        buyIOrder.replenish();
+                        // Change priority TODO
+                    }
                     sellIOrder.decreaseQuantity(tradedQuantity);
-                    sellIOrder.replenish();
+                    if (sellIOrder.getDisplayedQuantity() == 0) {
+                        sellIOrder.replenish();
+                        // Change priority TODO
+                    }
                 }
                 else if (buyOrder instanceof IcebergOrder buyIOrder) {
                     tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), matchingSellOrder.getQuantity());
                     buyIOrder.decreaseQuantity(tradedQuantity);
-                    buyIOrder.replenish();
+                    if (buyIOrder.getDisplayedQuantity() == 0) {
+                        buyIOrder.replenish();
+                        // Change priority TODO
+                    }
                     matchingSellOrder.decreaseQuantity(tradedQuantity);
                 }
                 else if (matchingSellOrder instanceof IcebergOrder sellIOrder) {
                     tradedQuantity = Math.min(buyOrder.getQuantity(), sellIOrder.getDisplayedQuantity());
                     buyOrder.decreaseQuantity(tradedQuantity);
                     sellIOrder.decreaseQuantity(tradedQuantity);
-                    sellIOrder.replenish();
+                    if (sellIOrder.getDisplayedQuantity() == 0) {
+                        sellIOrder.replenish();
+                        // Change priority TODO
+                    }
                 }
                 else {
                     tradedQuantity = Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity());
