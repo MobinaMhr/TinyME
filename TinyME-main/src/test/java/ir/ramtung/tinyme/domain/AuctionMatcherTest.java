@@ -94,6 +94,7 @@ public class AuctionMatcherTest {
                 LocalDateTime.now(), Side.BUY, 100, 15900, broker.getBrokerId(),
                 shareholder.getShareholderId(), 0);
         security.newOrder(enterOrderRq, broker, shareholder, matcher);
+
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
@@ -101,7 +102,7 @@ public class AuctionMatcherTest {
     }
 
     @Test
-    void check_if_MEQ_order_is_not_allowed_in_auction() {
+    void check_if_entering_MEQ_order_is_not_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
 
@@ -118,7 +119,7 @@ public class AuctionMatcherTest {
     }
 
     @Test
-    void check_if_stop_limit_order_order_is_not_allowed_in_auction() {
+    void check_if_entering_stop_limit_order_order_is_not_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
 
@@ -196,4 +197,127 @@ public class AuctionMatcherTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
     }
+
+    //////////////////////////////////////// new tests ////////////////////////////////////////
+    @Test
+    void check_if_updating_MEQ_order_is_not_allowed_in_auction_state() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+
+        assertThatNoException().isThrownBy(() -> security.newOrder(enterOrderRq, testBroker, shareholder, matcher));
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        // rest
+    }
+
+    @Test
+    void check_if_updating_stop_limit_order_order_is_not_allowed_in_auction_state() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+
+        assertThatNoException().isThrownBy(() -> security.newOrder(enterOrderRq, testBroker, shareholder, matcher));
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 250);
+
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_auction_to_auction_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_auction_to_continuous_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_continuous_to_auction_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_entering_new_order() {
+        //
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_updating_order() {
+        //
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_deleting_order() {
+        //
+    }
+
+//    @Test
+//    void check_if_() {
+//        //
+//    }
+//
+//    @Test
+//    void check_if_() {
+//        //
+//    }
+
 }
