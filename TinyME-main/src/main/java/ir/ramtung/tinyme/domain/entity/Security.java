@@ -138,12 +138,15 @@ public class Security {
         return matchResult;
     }
 
-    public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
+    public LinkedList<Trade> updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
         if (this.currentMatchingState == MatchingState.AUCTION) {
+            matcher.calculateReopeningPrice(this.orderBook);
             return matcher.auctionMatch(this.orderBook);
         }
         // other conditions? error or what?
         this.currentMatchingState = newMatchingState;
-        return MatchResult.executedInAuction();
+
+        return null;
+//        return MatchResult.executedInAuction();
     }
 }

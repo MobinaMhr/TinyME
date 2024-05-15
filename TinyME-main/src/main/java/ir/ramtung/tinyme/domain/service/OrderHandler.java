@@ -1,5 +1,6 @@
 package ir.ramtung.tinyme.domain.service;
 
+import com.fasterxml.jackson.databind.deser.DataFormatReaders;
 import ir.ramtung.tinyme.domain.entity.*;
 import ir.ramtung.tinyme.messaging.Message;
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
@@ -98,19 +99,16 @@ public class OrderHandler {
             validateChangeMatchingStateRq(changeMatchingStateRq);
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-            MatchResult matchResult = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
-
-            if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
-                eventPublisher.publish(new SecurityStateChangedEvent(changeMatchingStateRq.getSecurityIsin(),
-                        changeMatchingStateRq.getTargetState()));
-                for (var pair : MatchResult.tradePairs) { // instead of matchResult.tradePairs
-                    Order order = pair.getKey();
-                    for (Trade trade : pair.getValue()) {
-                        eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(),
-                                trade.getQuantity(), trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
-                    }
-                }
-            } // Does it own an else?
+            LinkedList<Trade> trades = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
+            // There is no check for true or false, would it cause some bug in test file??????
+            eventPublisher.publish(new SecurityStateChangedEvent(changeMatchingStateRq.getSecurityIsin(),
+                    changeMatchingStateRq.getTargetState()));
+            if (trades == null)
+                return;
+            for (Trade trade : trades) {
+                eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(), trade.getQuantity(),
+                        trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
+            }
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new ChangeMatchingStateRqRejectedEvent(
                     changeMatchingStateRq.getSecurityIsin(), changeMatchingStateRq.getTargetState()));

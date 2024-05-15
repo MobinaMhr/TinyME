@@ -1,5 +1,7 @@
 package ir.ramtung.tinyme.domain.entity;
 
+import ir.ramtung.tinyme.messaging.event.TradeEvent;
+
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +11,6 @@ public final class MatchResult {
     private final MatchingOutcome outcome;
     private final Order remainder;
     private final LinkedList<Trade> trades;
-    public static List<Map.Entry<Order, LinkedList<Trade>>> tradePairs = new LinkedList<>();
     public static MatchResult executed(Order remainder, List<Trade> trades) {
         return new MatchResult(MatchingOutcome.EXECUTED, remainder, new LinkedList<>(trades));
     }
@@ -41,16 +42,14 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
 
-    // i set the remainder to null. What impact will this have on the code?
-    // We could get the remainder from the auctionMatch method so we can set the field to true value.
-    public static MatchResult executedInAuction(List<Map.Entry<Order, LinkedList<Trade>>> tradePair) {
-        tradePairs = new LinkedList<>();
-        tradePairs = tradePair;
-//        for (Map.Entry<Order, LinkedList<Trade>> entry : tradePair) {
-//            tradePairs.add(new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, entry.getValue()));
-//        }
-        return executedInAuction();
-    }
+//    public MatchResult matchedInAuction(LinkedList<Trade> trades_) {
+//        this.trades = trades_;
+//        return new TradeEvent();
+////        return executedInAuction();
+//    }
+
+//eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(),
+//trade.getQuantity(), trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
 
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
