@@ -10,8 +10,9 @@ import java.util.*;
 @Service
 public class Matcher {
     private int lastTradePrice;
-    public int reopeningPrice = -1;//Default value
-    public int maxQuantity = -1; //Default value
+    //Default values
+    public int reopeningPrice = 0;
+    public int maxTradableQuantity = 0;
 
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) {
@@ -162,16 +163,20 @@ public class Matcher {
                 Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice, Math.min(buyOrder.getQuantity(),
                         matchingSellOrder.getQuantity()), buyOrder, matchingSellOrder);
 
-                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue()); // Added by me. TODO: Is there increase in path? I don't think so.
+                // Added by me. TODO: Is there increase in path? I don't think so.
+                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
                 trades.add(trade);
 
                 if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
                     buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
-                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
+//                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue()); done in auctionExecute
                     if (buyOrder instanceof IcebergOrder icebergOrder) {
                         icebergOrder.replenish();
+                        if (icebergOrder.getQuantity() == 0) {
+                            buyQueue.remove(icebergOrder);
+                        }
                     }
                     sellQueue.remove(matchingSellOrder);
                     // TODO:: handle if sell order is iceberg
@@ -187,6 +192,9 @@ public class Matcher {
                     matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
                     if (matchingSellOrder instanceof IcebergOrder icebergOrder) {
                         icebergOrder.replenish();
+                        if (icebergOrder.getQuantity() == 0) {
+                            buyQueue.remove(icebergOrder);
+                        }//TODO what if the matchingorder is an iceberg order?
                     }
                     buyQueue.remove(buyOrder);
                     // TODO:: handle if buy order is iceberg
@@ -199,10 +207,12 @@ public class Matcher {
         // are they really removed???? if you didn't get, contact me(Mobina).
         for (var order : sellQueue){
             auctionExecute(order);
+            // enque amin said
         }
 
         for (var order : buyQueue){
             auctionExecute(order);
+            // enque amin said
         }
 
         return trades;

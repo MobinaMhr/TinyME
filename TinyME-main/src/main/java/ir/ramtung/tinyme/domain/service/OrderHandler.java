@@ -69,6 +69,7 @@ public class OrderHandler {
             Shareholder shareholder = shareholderRepository.findShareholderById(enterOrderRq.getShareholderId());
             MatchResult matchResult;
             boolean isTypeStopLimitOrder;
+
             if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
                 isTypeStopLimitOrder = enterOrderRq.getStopPrice() > 0;
@@ -80,18 +81,22 @@ public class OrderHandler {
             }
 
             if (matchResult.outcome() == MatchingOutcome.EXECUTED && isTypeStopLimitOrder){
-                eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
+                eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(),
+                        matchResult.remainder().getOrderId()));
             }
 
             if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
-                eventPublisher.publish(new OpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(),
-                        matcher.maxQuantity));
+                eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
+                        matcher.getReopeningPrice(), matcher.maxTradableQuantity));
             }
+
             if(resultPublisher(matchResult, enterOrderRq))
                 return;
+
             executeActivatedSLO(enterOrderRq, security);
         } catch (InvalidRequestException ex) {
-            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));
+            eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(),
+                    enterOrderRq.getOrderId(), ex.getReasons()));
         }
     }
     public void handleChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) {
