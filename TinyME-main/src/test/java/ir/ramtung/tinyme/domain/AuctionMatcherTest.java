@@ -85,6 +85,11 @@ public class AuctionMatcherTest {
         );
         orders.forEach(order -> orderBook.enqueue(order));
 
+        List<Order> inactiveOrders = Arrays.asList(
+                new StopLimitOrder(1, security, Side.BUY, 304, 15700, broker, shareholder,0)
+        );
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
                 LocalDateTime.now(), Side.BUY, 100, 15900, broker.getBrokerId(),
                 shareholder.getShareholderId(), 0);
@@ -131,6 +136,37 @@ public class AuctionMatcherTest {
 
     @Test
     void check_if_reopening_works_properly() {  // TODO -> name must be better
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        orderHandler.handleEnterOrder(enterOrderRq);
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
+
+        System.out.println("LTP: " + matcher.getLastTradePrice());
+        System.out.println("RP: " + matcher.getReopeningPrice());
+        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
+        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        System.out.println("LTP: " + matcher.getLastTradePrice());
+        System.out.println("RP: " + matcher.getReopeningPrice());
+        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
+        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
+    }
+
+    @Test
+    void check_if_update_state_activates_stop_limit_orders() {  
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
         brokerRepository.addBroker(testBroker);
