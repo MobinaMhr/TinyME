@@ -42,7 +42,8 @@ public class Matcher {
                 break;
             }
 
-            Trade trade = new Trade(newOrder.getSecurity(), matchingOrder.getPrice(), Math.min(newOrder.getQuantity(), matchingOrder.getQuantity()), newOrder, matchingOrder);
+            Trade trade = new Trade(newOrder.getSecurity(), matchingOrder.getPrice(),
+                    Math.min(newOrder.getQuantity(), matchingOrder.getQuantity()), newOrder, matchingOrder);
             if (newOrder.getSide() == Side.BUY) {
                 if (trade.buyerHasEnoughCredit())
                     trade.decreaseBuyersCredit();
@@ -92,7 +93,7 @@ public class Matcher {
         return tradableQuantityBuy;
     }
 
-    public void calculateReopeningPrice(OrderBook orderBook) {
+    private void calculateReopeningPrice(OrderBook orderBook) {
         this.reopeningPrice = 0;
         int tradableQuantity = 0;
         int maxQuantity = 0;
@@ -134,7 +135,7 @@ public class Matcher {
             this.reopeningPrice = lastTradePrice;
     }
 
-    public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
+    private LinkedList<Trade> auctionMatch(OrderBook orderBook) {
         LinkedList<Order> sellQueue = new LinkedList<>();
         for (var order : orderBook.getSellQueue()) {
             if (this.reopeningPrice < order.getPrice())
@@ -165,7 +166,7 @@ public class Matcher {
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
                 trades.add(trade);
-                
+
                 if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
                     buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
                     buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
@@ -199,10 +200,6 @@ public class Matcher {
             auctionExecute(order);
         }
 
-        // update last trade price = reopening price. // TODO.
-//        return matchedInAuction(trades);
-        if(trades.size() > 0)
-            lastTradePrice = reopeningPrice;
         return trades;
     }
 
@@ -288,5 +285,15 @@ public class Matcher {
         calculateReopeningPrice(orderBook);
 
         return MatchResult.executedInAuction();
+    }
+
+    public LinkedList<Trade> startReopeningProcess(OrderBook orderBook) {
+        LinkedList<Trade> trades = null;
+        calculateReopeningPrice(orderBook);
+        trades = auctionMatch(orderBook);
+        if (!trades.isEmpty()) {
+            lastTradePrice = reopeningPrice;
+        }
+        return trades;
     }
 }
