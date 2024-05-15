@@ -157,8 +157,9 @@ public class Matcher {
             while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
                 Order matchingSellOrder = sellQueue.getFirst();
 
-                Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice, Math.min(buyOrder.getQuantity(),
-                        matchingSellOrder.getQuantity()), buyOrder, matchingSellOrder);
+                Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice,
+                        Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
+                        buyOrder, matchingSellOrder);
 
                 // Added by me. TODO: Is there increase in path? I don't think so.
                 buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
@@ -166,34 +167,47 @@ public class Matcher {
                 trade.increaseSellersCredit();
                 trades.add(trade);
 
-                if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
-                    buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
-                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
-                    if (buyOrder instanceof IcebergOrder icebergOrder) {
-                        icebergOrder.replenish();
-                    }
-                    matchingSellOrder.makeQuantityZero();
-                    // TODO:: handle if sell order is iceberg
-                } else if (buyOrder.getQuantity() == matchingSellOrder.getQuantity()) {
-                    buyOrder.makeQuantityZero();
-                    matchingSellOrder.makeQuantityZero();
-                    // TODO:: handle if sell and buy order is iceberg
-                } else { // buyOrder.getQuantity() < matchingSellOrder.getQuantity()
-                    matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
-                    if (matchingSellOrder instanceof IcebergOrder icebergOrder) {
-                        icebergOrder.replenish(); //TODO what if the matchingorder is an iceberg order?
-                    }
-                    buyOrder.makeQuantityZero();
-                    // TODO:: handle if buy order is iceberg
-
+                int tradedQuantity = 0;
+                if (buyOrder instanceof IcebergOrder buyIOrder &&
+                        matchingSellOrder instanceof IcebergOrder sellIOrder) {
+                    tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), sellIOrder.getDisplayedQuantity());
+                    buyIOrder.decreaseQuantity(tradedQuantity);
+                    buyIOrder.replenish();
+                    sellIOrder.decreaseQuantity(tradedQuantity);
+                    sellIOrder.replenish();
                 }
+                else if (buyOrder instanceof IcebergOrder buyIOrder) {
+                    tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), matchingSellOrder.getQuantity());
+                    buyIOrder.decreaseQuantity(tradedQuantity);
+                    buyIOrder.replenish();
+                    matchingSellOrder.decreaseQuantity(tradedQuantity);
+                }
+                else if (matchingSellOrder instanceof IcebergOrder sellIOrder) {
+                    tradedQuantity = Math.min(buyOrder.getQuantity(), sellIOrder.getDisplayedQuantity());
+                    buyOrder.decreaseQuantity(tradedQuantity);
+                    sellIOrder.decreaseQuantity(tradedQuantity);
+                    sellIOrder.replenish();
+                }
+                else {
+                    tradedQuantity = Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity());
+                    buyOrder.decreaseQuantity(tradedQuantity);
+                    matchingSellOrder.decreaseQuantity(tradedQuantity);
+                }
+
+                // if value = 0 nothing changes :
+                buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
+                matchingSellOrder.getBroker().decreaseCreditBy(matchingSellOrder.getValue());
             }
         }
 
-        Iterator<Order> iterator = orderBook.getSellQueue().iterator();
+        Iterator<Order> iterator;
+        iterator = orderBook.getSellQueue().iterator();
         while (iterator.hasNext()) {
             Order currentOrder = iterator.next();
-            if (currentOrder.getQuantity() == 0) {
+            if (currentOrder instanceof IcebergOrder icebergOrder &&
+                    icebergOrder.getDisplayedQuantity() == 0) {
+                iterator.remove();
+            } else if (currentOrder.getQuantity() == 0) {
                 iterator.remove();
             }
         }
@@ -201,7 +215,10 @@ public class Matcher {
         iterator = orderBook.getBuyQueue().iterator();
         while (iterator.hasNext()) {
             Order currentOrder = iterator.next();
-            if (currentOrder.getQuantity() == 0) {
+            if (currentOrder instanceof IcebergOrder icebergOrder &&
+                    icebergOrder.getDisplayedQuantity() == 0) {
+                iterator.remove();
+            } else if (currentOrder.getQuantity() == 0) {
                 iterator.remove();
             }
         }
