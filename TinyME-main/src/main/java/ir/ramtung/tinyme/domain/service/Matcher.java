@@ -201,6 +201,8 @@ public class Matcher {
 
         // update last trade price = reopening price. // TODO.
 //        return matchedInAuction(trades);
+        if(trades.size() > 0)
+            lastTradePrice = reopeningPrice;
         return trades;
     }
 
