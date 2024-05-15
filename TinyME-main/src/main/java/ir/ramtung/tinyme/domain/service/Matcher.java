@@ -11,7 +11,7 @@ import java.util.*;
 public class Matcher {
     private int lastTradePrice;
     public int reopeningPrice = -1;//Default value
-    public int tradableQuantity = -1; //Default value
+    public int maxQuantity = -1; //Default value
 
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) {
@@ -94,13 +94,13 @@ public class Matcher {
 
     private void calculateReopeningPrice(OrderBook orderBook) {
         this.reopeningPrice = 0;
-        this.tradableQuantity = 0;
+        int tradableQuantity = 0;
         int maxQuantity = 0;
 
         for(Order buyOrder: orderBook.getBuyQueue()){
-            this.tradableQuantity += buyOrder.getTotalQuantity();
+            tradableQuantity += buyOrder.getTotalQuantity();
             int tradableQuantitySell = checkSellQueue(buyOrder.getPrice(), orderBook.getSellQueue());
-            int exchangedQuantity = Math.min(tradableQuantitySell, this.tradableQuantity);
+            int exchangedQuantity = Math.min(tradableQuantitySell, tradableQuantity);
             if(exchangedQuantity > maxQuantity){
                 this.reopeningPrice = buyOrder.getPrice();
                 maxQuantity = exchangedQuantity;
@@ -112,11 +112,11 @@ public class Matcher {
                 }
             }
         }
-        this.tradableQuantity = 0;
+        tradableQuantity = 0;
         for(Order sellOrder:orderBook.getSellQueue()){
-            this.tradableQuantity += sellOrder.getTotalQuantity();
+            tradableQuantity += sellOrder.getTotalQuantity();
             int tradableQuantityBuy = checkBuyQueue(sellOrder.getPrice(), orderBook.getBuyQueue());
-            int exchangedQuantity = Math.min(tradableQuantityBuy, this.tradableQuantity);
+            int exchangedQuantity = Math.min(tradableQuantityBuy, tradableQuantity);
             if(exchangedQuantity > maxQuantity){
                 this.reopeningPrice = sellOrder.getPrice();
                 maxQuantity = exchangedQuantity;
@@ -128,7 +128,6 @@ public class Matcher {
                 }
             }
         }
-
         int maxQuantityWithLastPrice = Math.min(checkSellQueue(lastTradePrice, orderBook.getBuyQueue()),
                 checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
         if(maxQuantityWithLastPrice == maxQuantity)
