@@ -25,7 +25,7 @@ public class Message {
     public static final String CANNOT_UPDATE_ACTIVE_STOP_LIMIT_ORDER = "cannot update active stop limit order";
     public static final String CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE = "cannot update stop limit order in auction mode";
     public static final String CANNOT_UPDATE_MEQ_ORDER_IN_AUCTION_MODE = "cannot update meq order in auction mode";
-
+    public static final String CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE = "cannot delete stop limit order in auction mode";
 
 
 }

@@ -68,8 +68,12 @@ public class Security {
 
     public MatchResult deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        if (order == null)
+        if (order == null) {
             order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+            if(order != null && currentMatchingState == MatchingState.AUCTION){
+                throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
+            }
+        }
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         if (order.getSide() == Side.BUY)
@@ -89,16 +93,9 @@ public class Security {
 
         if (order == null) {
             order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-            if (order != null && updateOrderRq.getStopPrice() > 0) {
-                throw new InvalidRequestException(Message.CANNOT_UPDATE_ACTIVE_STOP_LIMIT_ORDER);
-            }
         }
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
-        }
-
-        if(order.getMinimumExecutionQuantity() > 0 && currentMatchingState == MatchingState.AUCTION){
-            throw new InvalidRequestException(Message.CANNOT_UPDATE_MEQ_ORDER_IN_AUCTION_MODE);
         }
 
         if(order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
