@@ -92,7 +92,7 @@ public class Matcher {
         return tradableQuantityBuy;
     }
 
-    private void calculateReopeningPrice(OrderBook orderBook) {
+    public void calculateReopeningPrice(OrderBook orderBook) {
         this.reopeningPrice = 0;
         int tradableQuantity = 0;
         int maxQuantity = 0;
@@ -134,7 +134,7 @@ public class Matcher {
             this.reopeningPrice = lastTradePrice;
     }
 
-    public MatchResult auctionMatch(OrderBook orderBook) {
+    public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
         LinkedList<Order> sellQueue = new LinkedList<>();
         for (var order : orderBook.getSellQueue()) {
             if (this.reopeningPrice < order.getPrice())
@@ -152,22 +152,26 @@ public class Matcher {
             buyQueue.add(order);
         }
 
-        List<Map.Entry<Order, LinkedList<Trade>>> tradePair = new ArrayList<>();
         LinkedList<Trade> trades = new LinkedList<>();
         for (var buyOrder : buyQueue) {
+
             while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
                 Order matchingSellOrder = sellQueue.getFirst();
+
                 Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice, Math.min(buyOrder.getQuantity(),
                         matchingSellOrder.getQuantity()), buyOrder, matchingSellOrder);
+
+                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue()); // Added by me. TODO: Is there increase in path? I don't think so.
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
                 trades.add(trade);
-
-                // Add credit so in auctionExecute the new value will be decreased from buyOrder:>
-                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
-
+                
                 if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
                     buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
+                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
+                    if (buyOrder instanceof IcebergOrder icebergOrder) {
+                        icebergOrder.replenish();
+                    }
                     sellQueue.remove(matchingSellOrder);
                 } else if (buyOrder.getQuantity() == matchingSellOrder.getQuantity()) {
                     buyOrder.makeQuantityZero();
@@ -177,10 +181,12 @@ public class Matcher {
                     sellQueue.remove(matchingSellOrder);
                 } else { // buyOrder.getQuantity() < matchingSellOrder.getQuantity()
                     matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
+                    if (matchingSellOrder instanceof IcebergOrder icebergOrder) {
+                        icebergOrder.replenish();
+                    }
                     buyQueue.remove(buyOrder);
                 }
             }
-            tradePair.add(Map.entry(buyOrder, trades));
         }
 
         // Make sure this is global OrderBook. I mean in this method we removed these orders from orderBook,
@@ -194,7 +200,8 @@ public class Matcher {
         }
 
         // update last trade price = reopening price. // TODO.
-        return MatchResult.executedInAuction(tradePair);
+//        return matchedInAuction(trades);
+        return trades;
     }
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
@@ -266,6 +273,7 @@ public class Matcher {
         }
         // TODO : check for other types of order.
 
+        // TODO. does the same in update order?
         if (order.getSide() == Side.BUY) {
             if (order.getBroker().getCredit() < order.getValue())
                 return MatchResult.notEnoughCredit();
