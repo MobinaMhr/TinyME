@@ -86,7 +86,7 @@ public class AuctionMatcherTest {
         orders.forEach(order -> orderBook.enqueue(order));
 
         List<Order> inactiveOrders = Arrays.asList(
-                new StopLimitOrder(1, security, Side.BUY, 304, 15700, broker, shareholder,0)
+                new StopLimitOrder(2, security, Side.BUY, 304, 15700, broker, shareholder,0)
         );
         inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
 
@@ -209,21 +209,24 @@ public class AuctionMatcherTest {
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
-                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                2, LocalDateTime.now(), Side.BUY, 350, 15900, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 0, 250);
 
         assertThatNoException().isThrownBy(() -> security.newOrder(enterOrderRq, testBroker, shareholder, matcher));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
 
         changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
 
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
         EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
                 2, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 0, 250);
 
-        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-        // rest
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
     }
 
     @Test
@@ -249,8 +252,7 @@ public class AuctionMatcherTest {
                 2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 250);
 
-        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-        // rest
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
     }
 
     @Test
