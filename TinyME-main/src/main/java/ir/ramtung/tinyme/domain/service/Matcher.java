@@ -193,8 +193,8 @@ public class Matcher {
             auctionExecute(order);
         }
 
-        MatchResult.executedInAuction(tradePair);
-        return MatchResult.executedInAuction();
+        // update last trade price = reopening price. // TODO.
+        return MatchResult.executedInAuction(tradePair);
     }
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {

@@ -43,13 +43,13 @@ public final class MatchResult {
 
     // i set the remainder to null. What impact will this have on the code?
     // We could get the remainder from the auctionMatch method so we can set the field to true value.
-    public static void executedInAuction(List<Map.Entry<Order, LinkedList<Trade>>> tradePair) {
+    public static MatchResult executedInAuction(List<Map.Entry<Order, LinkedList<Trade>>> tradePair) {
         tradePairs = new LinkedList<>();
         tradePairs = tradePair;
 //        for (Map.Entry<Order, LinkedList<Trade>> entry : tradePair) {
 //            tradePairs.add(new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, entry.getValue()));
 //        }
-        return;
+        return executedInAuction();
     }
 
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
