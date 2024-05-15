@@ -56,6 +56,8 @@ public class OrderHandler {
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
         else
             eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+
+        // TODO
         if (!matchResult.trades().isEmpty())
             eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
         return false;
@@ -86,8 +88,9 @@ public class OrderHandler {
                         matchResult.remainder().getOrderId()));
             }
 
-            // This is for new order and update order.
             if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
+                eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(),
+                        enterOrderRq.getOrderId()));
                 eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
                         matcher.getReopeningPrice(), matcher.maxTradableQuantity));
             }
