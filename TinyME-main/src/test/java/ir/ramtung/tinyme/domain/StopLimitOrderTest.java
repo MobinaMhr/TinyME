@@ -203,7 +203,7 @@ public class StopLimitOrderTest {
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
         DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.BUY, 2);
-        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq));
+        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq, matcher));
         assertThat(inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(),deleteOrderRq.getOrderId())).isNull();
     }
     @Test

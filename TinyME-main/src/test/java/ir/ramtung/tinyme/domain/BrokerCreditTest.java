@@ -219,13 +219,13 @@ public class BrokerCreditTest {
     @Test
     void testSellerOrderDelete() {
         DeleteOrderRq deleteOrderRq = createDeleteOrderRq(++requestId, Side.SELL, 6);
-        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq));
+        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq, matcher));
         checkCreditValues(buyerCredit, sellerCredit);
     }
     @Test
     void testBuyerOrderDelete() {
         DeleteOrderRq deleteOrderRq = createDeleteOrderRq(++requestId, Side.BUY, 1);
-        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq));
+        assertThatNoException().isThrownBy(() -> security.deleteOrder(deleteOrderRq, matcher));
         checkCreditValues(buyerCredit+304*15700, sellerCredit);
     }
     @Test
