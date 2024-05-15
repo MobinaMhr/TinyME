@@ -84,7 +84,7 @@ public class OrderHandler {
 
             if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
                 eventPublisher.publish(new OpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(),
-                        matcher.tradableQuantity));
+                        matcher.maxQuantity));
             }
             if(resultPublisher(matchResult, enterOrderRq))
                 return;
