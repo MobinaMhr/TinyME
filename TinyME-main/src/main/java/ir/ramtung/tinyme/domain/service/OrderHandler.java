@@ -57,7 +57,7 @@ public class OrderHandler {
         else
             eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
 
-        // TODO
+        // TODO there is duplicated code
         if (!matchResult.trades().isEmpty())
             eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
         return false;
@@ -141,6 +141,8 @@ public class OrderHandler {
                 eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(),
                         matchResult.remainder().getOrderId()));
             }
+
+            // This is duplicated code
             if (!matchResult.trades().isEmpty()) {
                 eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(),
                         enterOrderRq.getOrderId(), matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));

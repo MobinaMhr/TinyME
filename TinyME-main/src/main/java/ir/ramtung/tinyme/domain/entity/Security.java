@@ -83,12 +83,6 @@ public class Security {
         return result;
     }
 
-//    // TODO. does the same in update order?
-//        if (order.getSide() == Side.BUY) {
-//        if (order.getBroker().getCredit() < order.getValue())
-//            return MatchResult.notEnoughCredit();
-//        order.getBroker().decreaseCreditBy(order.getValue());
-//    }
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
         order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
@@ -144,9 +138,10 @@ public class Security {
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
 
-
         if (!losesPriority) {
-            if (updateOrderRq.getSide() == Side.BUY) { // TODO: do we check it has enough credit??
+            if (updateOrderRq.getSide() == Side.BUY) {
+                if (order.getBroker().getCredit() < order.getValue())
+                    return MatchResult.notEnoughCredit();
                 order.getBroker().decreaseCreditBy(order.getValue());
             }
             if (currentMatchingState == MatchingState.AUCTION) {
@@ -171,8 +166,11 @@ public class Security {
         if (matchResult.outcome() != MatchingOutcome.EXECUTED
                 && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             orderBook.enqueue(originalOrder);
-            if (updateOrderRq.getSide() == Side.BUY) { // TODO: do we check it has enough credit??
-                // TODO: note that we already deacersed Credit in both executes
+            if (updateOrderRq.getSide() == Side.BUY) {
+                if (originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {
+                    return MatchResult.notEnoughCredit();
+                }
+                // TODO: note that we already deceased Credit in both executes
                 originalOrder.getBroker().decreaseCreditBy(originalOrder.getValue());
             }
         }

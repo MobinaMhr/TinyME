@@ -299,7 +299,6 @@ public class Matcher {
         return result;
     }
     public MatchResult auctionExecute(Order order) {
-        // TODO. does the same in update order?
         if (order.getSide() == Side.BUY) {
             if (order.getBroker().getCredit() < order.getValue())
                 return MatchResult.notEnoughCredit();
