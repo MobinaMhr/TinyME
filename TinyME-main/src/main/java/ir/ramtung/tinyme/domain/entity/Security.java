@@ -154,7 +154,8 @@ public class Security {
             matchResult = matcher.execute(order);
         }
 
-        if (matchResult.outcome() != MatchingOutcome.EXECUTED && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
+        if (matchResult.outcome() != MatchingOutcome.EXECUTED
+                && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             //TODO: would be involved in new project?
             orderBook.enqueue(originalOrder);
             if (updateOrderRq.getSide() == Side.BUY) {
@@ -169,26 +170,17 @@ public class Security {
 
         if (this.currentMatchingState == MatchingState.AUCTION) {
             reopeningTrades =  matcher.startReopeningProcess(this.orderBook);
-        }
-        // TODO::other conditions? error or what?
-
-        if (currentMatchingState == MatchingState.AUCTION && newMatchingState == MatchingState.AUCTION){
             Order order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
-            while (order != null){
-                matcher.auctionExecute(order);
+
+            while (order != null) {
+                if (newMatchingState == MatchingState.AUCTION) {
+                    matcher.auctionExecute(order);
+                } else { // MatchingState.CONTINUOUS
+                    matcher.execute(order);
+                }
                 order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
             }
         }
-
-        if (currentMatchingState == MatchingState.AUCTION && newMatchingState == MatchingState.CONTINUOUS){
-            Order order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
-            while (order != null){
-                matcher.execute(order);
-                order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
-            }
-        }
-
-//        else // this.currentMatchingState == MatchingState.CONTINUOUS DO NOTHING
 
         this.currentMatchingState = newMatchingState;
         return reopeningTrades;
