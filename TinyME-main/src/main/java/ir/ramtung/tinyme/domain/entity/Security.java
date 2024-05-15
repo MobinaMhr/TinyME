@@ -53,6 +53,12 @@ public class Security {
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
+            if (order instanceof StopLimitOrder stopLimitOrder) {
+                return MatchResult.stopLimitOrderIsNotAllowedInAuction();
+            }
+            if (order.getMinimumExecutionQuantity() > 0) {
+                return MatchResult.meqOrderIsNotAllowedInAuction();
+            }
             result = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
@@ -70,10 +76,12 @@ public class Security {
             order.getBroker().increaseCreditBy(order.getValue());
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        //TODO:: if in auction recalculate the opening price and publish it
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
+
 
         order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         if (order == null) {
@@ -85,6 +93,16 @@ public class Security {
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
+
+        if(order.getMinimumExecutionQuantity() > 0 && currentMatchingState == MatchingState.AUCTION){
+            throw new InvalidRequestException(Message.CANNOT_UPDATE_MEQ_ORDER_IN_AUCTION_MODE);
+        }
+
+        if(order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
+            throw new InvalidRequestException(Message.CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
+        }
+
+        //TODO :: calc new opening price after update
 
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
@@ -144,6 +162,24 @@ public class Security {
         if (this.currentMatchingState == MatchingState.AUCTION) {
             reopeningTrades =  matcher.startReopeningProcess(this.orderBook);
         }
+        // TODO::other conditions? error or what?
+
+        if (currentMatchingState == MatchingState.AUCTION && newMatchingState == MatchingState.AUCTION){
+            Order order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            while (order != null){
+                matcher.auctionExecute(order);
+                order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            }
+        }
+
+        if (currentMatchingState == MatchingState.AUCTION && newMatchingState == MatchingState.CONTINUOUS){
+            Order order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            while (order != null){
+                matcher.execute(order);
+                order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            }
+        }
+
 //        else // this.currentMatchingState == MatchingState.CONTINUOUS DO NOTHING
 
         this.currentMatchingState = newMatchingState;

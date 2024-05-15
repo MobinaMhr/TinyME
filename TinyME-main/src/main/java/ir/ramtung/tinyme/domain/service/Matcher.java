@@ -174,18 +174,23 @@ public class Matcher {
                         icebergOrder.replenish();
                     }
                     sellQueue.remove(matchingSellOrder);
+                    // TODO:: handle if sell order is iceberg
                 } else if (buyOrder.getQuantity() == matchingSellOrder.getQuantity()) {
                     buyOrder.makeQuantityZero();
                     buyQueue.remove(buyOrder);
 
                     matchingSellOrder.makeQuantityZero();
                     sellQueue.remove(matchingSellOrder);
+                    // TODO:: handle if sell and buy order is iceberg
+
                 } else { // buyOrder.getQuantity() < matchingSellOrder.getQuantity()
                     matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
                     if (matchingSellOrder instanceof IcebergOrder icebergOrder) {
                         icebergOrder.replenish();
                     }
                     buyQueue.remove(buyOrder);
+                    // TODO:: handle if buy order is iceberg
+
                 }
             }
         }
@@ -264,12 +269,7 @@ public class Matcher {
         return result;
     }
     public MatchResult auctionExecute(Order order) {
-        if (order instanceof StopLimitOrder stopLimitOrder) {
-            return MatchResult.stopLimitOrderIsNotAllowedInAuction();
-        }
-        if (order.getMinimumExecutionQuantity() > 0) {
-            return MatchResult.meqOrderIsNotAllowedInAuction();
-        }
+
         // TODO : check for other types of order.
 
         // TODO. does the same in update order?
