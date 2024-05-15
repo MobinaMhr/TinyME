@@ -141,8 +141,6 @@ public class Matcher {
         for (var order : orderBook.getSellQueue()) {
             if (this.reopeningPrice < order.getPrice())
                 continue;
-            orderBook.removeByOrderId(Side.SELL, order.getOrderId());
-            //TODO : will it remove from global orderbook?
             sellQueue.add(order);
         }
 
@@ -150,7 +148,6 @@ public class Matcher {
         for (var order : orderBook.getBuyQueue()) {
             if (this.reopeningPrice > order.getPrice())
                 continue;
-            orderBook.removeByOrderId(Side.BUY, order.getOrderId());
             buyQueue.add(order);
         }
 
@@ -171,50 +168,43 @@ public class Matcher {
 
                 if (buyOrder.getQuantity() > matchingSellOrder.getQuantity()) {
                     buyOrder.decreaseQuantity(matchingSellOrder.getQuantity());
-//                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue()); done in auctionExecute
+                    buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
                     if (buyOrder instanceof IcebergOrder icebergOrder) {
                         icebergOrder.replenish();
-                        if (icebergOrder.getQuantity() == 0) {
-                            buyQueue.remove(icebergOrder);
-                        }
                     }
-                    sellQueue.remove(matchingSellOrder);
+                    matchingSellOrder.makeQuantityZero();
                     // TODO:: handle if sell order is iceberg
                 } else if (buyOrder.getQuantity() == matchingSellOrder.getQuantity()) {
                     buyOrder.makeQuantityZero();
-                    buyQueue.remove(buyOrder);
-
                     matchingSellOrder.makeQuantityZero();
-                    sellQueue.remove(matchingSellOrder);
                     // TODO:: handle if sell and buy order is iceberg
-
                 } else { // buyOrder.getQuantity() < matchingSellOrder.getQuantity()
                     matchingSellOrder.decreaseQuantity(buyOrder.getQuantity());
                     if (matchingSellOrder instanceof IcebergOrder icebergOrder) {
-                        icebergOrder.replenish();
-                        if (icebergOrder.getQuantity() == 0) {
-                            buyQueue.remove(icebergOrder);
-                        }//TODO what if the matchingorder is an iceberg order?
+                        icebergOrder.replenish(); //TODO what if the matchingorder is an iceberg order?
                     }
-                    buyQueue.remove(buyOrder);
+                    buyOrder.makeQuantityZero();
                     // TODO:: handle if buy order is iceberg
 
                 }
             }
         }
 
-        // Make sure this is global OrderBook. I mean in this method we removed these orders from orderBook,
-        // are they really removed???? if you didn't get, contact me(Mobina).
-        for (var order : sellQueue){
-            auctionExecute(order);
-            // enque amin said
+        Iterator<Order> iterator = orderBook.getSellQueue().iterator();
+        while (iterator.hasNext()) {
+            Order currentOrder = iterator.next();
+            if (currentOrder.getQuantity() == 0) {
+                iterator.remove();
+            }
         }
 
-        for (var order : buyQueue){
-            auctionExecute(order);
-            // enque amin said
+        iterator = orderBook.getBuyQueue().iterator();
+        while (iterator.hasNext()) {
+            Order currentOrder = iterator.next();
+            if (currentOrder.getQuantity() == 0) {
+                iterator.remove();
+            }
         }
-
         return trades;
     }
 
