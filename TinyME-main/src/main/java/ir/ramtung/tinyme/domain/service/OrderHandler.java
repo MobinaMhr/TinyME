@@ -80,19 +80,21 @@ public class OrderHandler {
                 matchResult = security.updateOrder(enterOrderRq, matcher);
             }
 
-            if (matchResult.outcome() == MatchingOutcome.EXECUTED && isTypeStopLimitOrder){
+            if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED
+                    && isTypeStopLimitOrder){
                 eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(),
                         matchResult.remainder().getOrderId()));
             }
 
-            if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
+            // This is for new order and update order.
+            if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
                 eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
                         matcher.getReopeningPrice(), matcher.maxTradableQuantity));
             }
 
-            if(resultPublisher(matchResult, enterOrderRq))
+            if(matchResult != null && resultPublisher(matchResult, enterOrderRq)) {
                 return;
-
+            }
             executeActivatedSLO(enterOrderRq, security);
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(),
@@ -149,8 +151,12 @@ public class OrderHandler {
         try {
             validateDeleteOrderRq(deleteOrderRq);
             Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
-            security.deleteOrder(deleteOrderRq);
+            MatchResult result = security.deleteOrder(deleteOrderRq, matcher);
             eventPublisher.publish(new OrderDeletedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId()));
+            if (result != null &&  result.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
+                eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
+                        matcher.getReopeningPrice(), matcher.maxTradableQuantity));
+            }
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId(), ex.getReasons()));
         }

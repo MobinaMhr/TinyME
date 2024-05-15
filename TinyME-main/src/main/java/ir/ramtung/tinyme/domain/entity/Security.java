@@ -66,7 +66,7 @@ public class Security {
         return result;
     }
 
-    public void deleteOrder(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
+    public MatchResult deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null)
             order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
@@ -76,9 +76,19 @@ public class Security {
             order.getBroker().increaseCreditBy(order.getValue());
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        //TODO:: if in auction recalculate the opening price and publish it
+        MatchResult result = null;
+        if (currentMatchingState == MatchingState.AUCTION) {
+            result = matcher.calculateReopeningPrice(orderBook);
+        }
+        return result;
     }
 
+//    // TODO. does the same in update order?
+//        if (order.getSide() == Side.BUY) {
+//        if (order.getBroker().getCredit() < order.getValue())
+//            return MatchResult.notEnoughCredit();
+//        order.getBroker().decreaseCreditBy(order.getValue());
+//    }
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = null;
         order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
@@ -100,8 +110,6 @@ public class Security {
         if(order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
             throw new InvalidRequestException(Message.CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
-
-        //TODO :: calc new opening price after update
 
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
@@ -136,9 +144,14 @@ public class Security {
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
 
+
         if (!losesPriority) {
-            if (updateOrderRq.getSide() == Side.BUY) {
+            if (updateOrderRq.getSide() == Side.BUY) { // TODO: do we check it has enough credit??
                 order.getBroker().decreaseCreditBy(order.getValue());
+            }
+            if (currentMatchingState == MatchingState.AUCTION) {
+                matcher.calculateReopeningPrice(orderBook);
+                // return this result
             }
             return MatchResult.executed(null, List.of());
         }
@@ -154,11 +167,12 @@ public class Security {
             matchResult = matcher.execute(order);
         }
 
+        // TODO: do we check in else statement, it will decreaseCredit????
         if (matchResult.outcome() != MatchingOutcome.EXECUTED
                 && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
-            //TODO: would be involved in new project?
             orderBook.enqueue(originalOrder);
-            if (updateOrderRq.getSide() == Side.BUY) {
+            if (updateOrderRq.getSide() == Side.BUY) { // TODO: do we check it has enough credit??
+                // TODO: note that we already deacersed Credit in both executes
                 originalOrder.getBroker().decreaseCreditBy(originalOrder.getValue());
             }
         }
@@ -175,6 +189,7 @@ public class Security {
             while (order != null) {
                 if (newMatchingState == MatchingState.AUCTION) {
                     matcher.auctionExecute(order);
+                    // return this result
                 } else { // MatchingState.CONTINUOUS
                     matcher.execute(order);
                 }

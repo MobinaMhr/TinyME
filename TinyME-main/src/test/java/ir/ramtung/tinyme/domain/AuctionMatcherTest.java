@@ -135,7 +135,8 @@ public class AuctionMatcherTest {
     }
 
     @Test
-    void check_if_reopening_works_properly() {  // TODO -> name must be better
+    void check_if_reopening_works_properly() {
+        // TODO -> name must be better
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
         brokerRepository.addBroker(testBroker);

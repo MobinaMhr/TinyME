@@ -94,7 +94,7 @@ public class Matcher {
         return tradableQuantityBuy;
     }
 
-    private void calculateReopeningPrice(OrderBook orderBook) {
+    public MatchResult calculateReopeningPrice(OrderBook orderBook) {
         this.reopeningPrice = 0;
         int tradableQuantity = 0;
         int maxQuantity = 0;
@@ -134,6 +134,8 @@ public class Matcher {
                 checkBuyQueue(lastTradePrice, orderBook.getBuyQueue()));
         if(maxQuantityWithLastPrice == maxQuantity)
             this.reopeningPrice = lastTradePrice;
+
+    return MatchResult.executedInAuction();
     }
 
     private LinkedList<Trade> auctionMatch(OrderBook orderBook) {
@@ -161,7 +163,6 @@ public class Matcher {
                         Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
                         buyOrder, matchingSellOrder);
 
-                // Added by me. TODO: Is there increase in path? I don't think so.
                 buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
                 trade.decreaseBuyersCredit();
                 trade.increaseSellersCredit();
@@ -286,9 +287,6 @@ public class Matcher {
         return result;
     }
     public MatchResult auctionExecute(Order order) {
-
-        // TODO : check for other types of order.
-
         // TODO. does the same in update order?
         if (order.getSide() == Side.BUY) {
             if (order.getBroker().getCredit() < order.getValue())
@@ -299,9 +297,7 @@ public class Matcher {
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
 
-        calculateReopeningPrice(orderBook);
-
-        return MatchResult.executedInAuction();
+        return calculateReopeningPrice(orderBook);
     }
 
     public LinkedList<Trade> startReopeningProcess(OrderBook orderBook) {
