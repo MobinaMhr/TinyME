@@ -551,6 +551,56 @@ public class AuctionMatcherTest {
     }
 
     @Test
+    void check_if_iceberg_order_loses_priority_in_auction_match() {
+
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        security.getOrderBook().removeByOrderId(Side.BUY,1);
+        security.getOrderBook().removeByOrderId(Side.SELL,8);
+
+
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        orderBook.enqueue(new IcebergOrder(2, security, Side.SELL, 90, 15700, broker, shareholder,50));
+        orderBook.enqueue(new IcebergOrder(3, security, Side.SELL, 100, 15700, broker, shareholder,40));
+        orderBook.enqueue(new Order(1, security, Side.BUY, 80, 15900, testBroker, shareholder));
+
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+
+        verify(eventPublisher,times(3)).publish(any(SecurityStateChangedEvent.class));
+        verify(eventPublisher,times(3)).publish(any(TradeEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,1)).isNull();
+        assertThat(orderBook.findByOrderId(Side.SELL,2)).isNotNull();
+        assertThat(orderBook.findByOrderId(Side.SELL,3)).isNotNull();
+        assertThat(orderBook.findByOrderId(Side.SELL,2).getQuantity()).isEqualTo(40);
+        assertThat(orderBook.findByOrderId(Side.SELL,3).getQuantity()).isEqualTo(10);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15810);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 80 * 15900 + 100 * 15810);
+    }
+
+    @Test
     void check_if_reopening_price_is_calculated_properly_after_entering_new_order() {
         //
     }
