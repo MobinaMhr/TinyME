@@ -6,10 +6,7 @@ import ir.ramtung.tinyme.domain.service.Matcher;
 import ir.ramtung.tinyme.domain.service.OrderHandler;
 import ir.ramtung.tinyme.messaging.EventPublisher;
 import ir.ramtung.tinyme.messaging.Message;
-import ir.ramtung.tinyme.messaging.event.OrderAcceptedEvent;
-import ir.ramtung.tinyme.messaging.event.OrderActivateEvent;
-import ir.ramtung.tinyme.messaging.event.OrderExecutedEvent;
-import ir.ramtung.tinyme.messaging.event.OrderRejectedEvent;
+import ir.ramtung.tinyme.messaging.event.*;
 import ir.ramtung.tinyme.messaging.request.ChangeMatchingStateRq;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
@@ -138,6 +135,7 @@ public class AuctionMatcherTest {
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
 
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
@@ -147,24 +145,23 @@ public class AuctionMatcherTest {
                 LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 0);
         orderHandler.handleEnterOrder(enterOrderRq);
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
 
-        System.out.println("LTP: " + matcher.getLastTradePrice());
-        System.out.println("RP: " + matcher.getReopeningPrice());
-        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
-        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());
+        ChangeMatchingStateRq changeStateRq2 = ChangeMatchingStateRq.createNewChangeMatchingStateRq(security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq2);
+        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION)); //bug
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        System.out.println("LTP: " + matcher.getLastTradePrice());
-        System.out.println("RP: " + matcher.getReopeningPrice());
-        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
-        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());
+        assertThat(matcher.getLastTradePrice()).isEqualTo(matcher.getReopeningPrice());
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
     }
 }
+
+//        System.out.println("LTP: " + matcher.getLastTradePrice());
+//        System.out.println("RP: " + matcher.getReopeningPrice());
+//        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
+//        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());

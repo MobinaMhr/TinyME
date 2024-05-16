@@ -42,10 +42,7 @@ public class OrderHandler {
         }
 
         if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
-            eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(),
-                    enterOrderRq.getOrderId()));
-            eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
-                    matcher.getReopeningPrice(), matcher.maxTradableQuantity));
+            eventPublisher.publish(new OpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity));
         }
         if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
