@@ -108,14 +108,14 @@ public class Matcher {
     }
 
     public MatchResult calculateReopeningPrice(OrderBook orderBook) {
-
+        this.reopeningPrice = 0;
+        this.maxTradableQuantity = 0;
         calculateBestReopeningPriceInQueue(orderBook.getBuyQueue(), orderBook, Side.BUY);
         calculateBestReopeningPriceInQueue(orderBook.getSellQueue(), orderBook, Side.SELL);
         int maxQuantityWithLastPrice = Math.min(checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.BUY),
                 checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.SELL));
         if(maxQuantityWithLastPrice == this.maxTradableQuantity)
             this.reopeningPrice = lastTradePrice;
-
         return MatchResult.executedInAuction();
     }
 

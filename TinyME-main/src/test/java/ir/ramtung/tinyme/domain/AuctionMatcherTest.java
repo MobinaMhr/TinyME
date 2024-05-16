@@ -134,6 +134,7 @@ public class AuctionMatcherTest {
     void check_if_reopening_works_properly() {  // TODO -> name must be better
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
+
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
         verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
 
@@ -158,6 +159,34 @@ public class AuctionMatcherTest {
         assertThat(matcher.getLastTradePrice()).isEqualTo(matcher.getReopeningPrice());
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
+    }
+    @Test
+    void check_if_reopening_price_changes_after_delete(){
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
+
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        orderHandler.handleEnterOrder(enterOrderRq);
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
+
+        DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.SELL, 7);
+        orderHandler.handleDeleteOrder(deleteOrderRq);
+
+        verify(eventPublisher).publish(new OrderDeletedEvent(4,7));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 100));
     }
 }
 
