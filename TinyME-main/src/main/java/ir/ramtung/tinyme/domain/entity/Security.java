@@ -80,11 +80,11 @@ public class Security {
             order.getBroker().increaseCreditBy(order.getValue());
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            result = matcher.calculateReopeningPrice(orderBook);
+            matcher.calculateReopeningPrice(orderBook);
+            return MatchResult.executedInAuction(null);
         }
-        return result;
+        return MatchResult.executed(null, null);
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
@@ -174,25 +174,39 @@ public class Security {
         return matchResult;
     }
 
-    public LinkedList<Trade> updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
-        LinkedList<Trade> reopeningTrades = null;
-
+    public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
+        MatchResult matchResult = null;
         if (this.currentMatchingState == MatchingState.AUCTION) {
-            reopeningTrades =  matcher.startReopeningProcess(this.orderBook);
-            Order order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            matcher.calculateReopeningPrice(orderBook);
 
-            while (order != null) {
-                if (newMatchingState == MatchingState.AUCTION) {
-                    matcher.auctionExecute(order);
-                    // return this result
-                } else { // MatchingState.CONTINUOUS
-                    matcher.execute(order);
-                }
-                order = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+            LinkedList<Trade> trades = null;
+            trades = matcher.auctionMatch(orderBook);
+
+            if (trades.isEmpty()) {
+                return MatchResult.executedInAuction(null);
             }
-        }
+            matcher.setLastTradePrice(matcher.reopeningPrice);
 
+            Order activatedOrder = null;
+            while (true) {
+                activatedOrder = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
+                if (activatedOrder == null)
+                    break;
+                if (newMatchingState == MatchingState.AUCTION) {
+                    // other results?
+                    matchResult = matcher.auctionExecute(activatedOrder);
+                } else {
+                    // other results?
+                    matchResult = matcher.execute(activatedOrder);
+                }
+                trades.addAll(matchResult.trades());
+            }
+            return MatchResult.executedInAuction(trades);
+        }
         this.currentMatchingState = newMatchingState;
-        return reopeningTrades;
+        return matchResult;
     }
 }
+
+
+

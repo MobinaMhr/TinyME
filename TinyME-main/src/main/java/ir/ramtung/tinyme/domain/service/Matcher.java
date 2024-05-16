@@ -1,6 +1,7 @@
 package ir.ramtung.tinyme.domain.service;
 
 import ir.ramtung.tinyme.domain.entity.*;
+import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,9 @@ public class Matcher {
             return;
         }
         lastTradePrice = result.trades().getLast().getPrice();
+    }
+    public void setLastTradePrice(int price) {
+        lastTradePrice = price;
     }
 
     public MatchResult match(Order newOrder) {
@@ -107,7 +111,7 @@ public class Matcher {
         }
     }
 
-    public MatchResult calculateReopeningPrice(OrderBook orderBook) {
+    public void calculateReopeningPrice(OrderBook orderBook) {
         this.reopeningPrice = 0;
         this.maxTradableQuantity = 0;
         calculateBestReopeningPriceInQueue(orderBook.getBuyQueue(), orderBook, Side.BUY);
@@ -116,10 +120,9 @@ public class Matcher {
                 checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.SELL));
         if(maxQuantityWithLastPrice == this.maxTradableQuantity)
             this.reopeningPrice = lastTradePrice;
-        return MatchResult.executedInAuction();
     }
 
-    private LinkedList<Trade> auctionMatch(OrderBook orderBook) {
+    public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
         // maybe recalculate
         LinkedList<Trade> trades = new LinkedList<>();
 
@@ -223,6 +226,7 @@ public class Matcher {
             order.getSecurity().getOrderBook().enqueue(result.remainder());
         }
 
+        // Will it crash when result.trades() is null?
         for (Trade trade : result.trades()) {
             trade.getBuy().getShareholder().incPosition(trade.getSecurity(), trade.getQuantity());
             trade.getSell().getShareholder().decPosition(trade.getSecurity(), trade.getQuantity());
@@ -241,16 +245,8 @@ public class Matcher {
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
 
-        return calculateReopeningPrice(orderBook);
-    }
-
-    public LinkedList<Trade> startReopeningProcess(OrderBook orderBook) {
-        LinkedList<Trade> trades = null;
         calculateReopeningPrice(orderBook);
-        trades = auctionMatch(orderBook);
-        if (!trades.isEmpty()) {
-            lastTradePrice = reopeningPrice;
-        }
-        return trades;
+        LinkedList<Trade> trades = auctionMatch(orderBook);
+        return MatchResult.executedInAuction(trades);
     }
 }
