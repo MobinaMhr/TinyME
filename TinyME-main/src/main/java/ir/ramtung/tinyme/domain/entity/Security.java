@@ -101,6 +101,7 @@ public class Security {
 
         return order;
     }
+
     private void validateOrder(EnterOrderRq updateOrderRq, Order order) throws InvalidRequestException {
         if (order instanceof IcebergOrder && updateOrderRq.getPeakSize() == 0) {
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
@@ -114,12 +115,24 @@ public class Security {
             throw new InvalidRequestException(Message.CANNOT_CHANGE_MEQ_DURING_UPDATE);
         }
     }
+
     private boolean doesHaveEnoughPosition(EnterOrderRq updateOrderRq, Order order) {
         int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
-                - order.getQuantity()
-                + updateOrderRq.getQuantity();
+                - order.getQuantity() + updateOrderRq.getQuantity();
         return order.getShareholder().hasEnoughPositionsOn(this, position);
     }
+
+    private static boolean doesLosePriority(EnterOrderRq updateOrderRq, Order order, boolean quantityIncreased) {
+        double newPrice = updateOrderRq.getPrice();
+        boolean priceChanged = newPrice != order.getPrice();
+        boolean peakSizeIncreased = order instanceof IcebergOrder icebergOrder
+                && icebergOrder.getPeakSize() < updateOrderRq.getPeakSize();
+        boolean stopPriceChanged = order instanceof StopLimitOrder stopLimitOrder
+                && stopLimitOrder.getStopPrice() != updateOrderRq.getStopPrice();
+
+        return quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged;
+    }
+
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = findOrder(updateOrderRq);
         validateOrder(updateOrderRq, order);
@@ -127,12 +140,13 @@ public class Security {
                 && !doesHaveEnoughPosition(updateOrderRq, order)) {
             return MatchResult.notEnoughPositions();
         }
-        if (updateOrderRq.getSide() == Side.BUY) {
+
+        if (updateOrderRq.getSide() == Side.BUY)
             order.getBroker().increaseCreditBy(order.getValue());
-        }
 
         boolean quantityIncreased = order.isQuantityIncreased(updateOrderRq.getQuantity());
         boolean losesPriority = doesLosePriority(updateOrderRq, order, quantityIncreased);
+
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
 
@@ -144,8 +158,7 @@ public class Security {
             }
             if (currentMatchingState == MatchingState.AUCTION) {
                 matcher.calculateReopeningPrice(orderBook);
-                return MatchResult.executed(); // TODO
-                // return this result
+                return MatchResult.executed();
             }
             return MatchResult.executed(null, List.of());
         }
@@ -160,8 +173,9 @@ public class Security {
             matchResult = matcher.execute(order);
         }
 
-        if (matchResult.outcome() != MatchingOutcome.EXECUTED
-                && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
+        assert matchResult != null;
+        if (matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE
+                && matchResult.outcome() != MatchingOutcome.EXECUTED) {
             orderBook.enqueue(originalOrder);
             if (updateOrderRq.getSide() == Side.BUY) {
                 if (!originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {
@@ -171,17 +185,6 @@ public class Security {
             }
         }
         return matchResult;
-    }
-
-    private static boolean doesLosePriority(EnterOrderRq updateOrderRq, Order order, boolean quantityIncreased) {
-        double newPrice = updateOrderRq.getPrice();
-        boolean priceChanged = newPrice != order.getPrice();
-        boolean peakSizeIncreased = order instanceof IcebergOrder icebergOrder
-                && icebergOrder.getPeakSize() < updateOrderRq.getPeakSize();
-        boolean stopPriceChanged = order instanceof StopLimitOrder stopLimitOrder
-                && stopLimitOrder.getStopPrice() != updateOrderRq.getStopPrice();
-
-        return quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged;
     }
 
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
