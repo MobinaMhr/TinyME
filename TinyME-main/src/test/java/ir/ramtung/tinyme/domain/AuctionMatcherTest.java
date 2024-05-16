@@ -124,6 +124,8 @@ public class AuctionMatcherTest {
                 shareholder.getShareholderId(), 0, 15800);
 
         MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
+        verify(eventPublisher,times(0)).publish(any(OrderAcceptedEvent.class));
+
 
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);

@@ -200,7 +200,7 @@ public class Security {
                 }
                 trades.addAll(matchResult.trades());
             }
-            return MatchResult.executed(trades);
+            matchResult = MatchResult.executed(trades);
         }
         this.currentMatchingState = newMatchingState;
         return matchResult;
