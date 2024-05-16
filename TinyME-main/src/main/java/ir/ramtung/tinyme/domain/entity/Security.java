@@ -1,7 +1,6 @@
 package ir.ramtung.tinyme.domain.entity;
 
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
-import ir.ramtung.tinyme.messaging.request.ChangeMatchingStateRq;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
 import ir.ramtung.tinyme.domain.service.Matcher;
@@ -9,7 +8,6 @@ import ir.ramtung.tinyme.messaging.Message;
 import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Builder;
 import lombok.Getter;
-import org.apache.commons.lang3.ObjectUtils;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -53,7 +51,7 @@ public class Security {
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            if (order instanceof StopLimitOrder stopLimitOrder) {
+            if (order instanceof StopLimitOrder) {
                 return MatchResult.stopLimitOrderIsNotAllowedInAuction();
             }
             if (order.getMinimumExecutionQuantity() > 0) {
@@ -82,9 +80,9 @@ public class Security {
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
-            return MatchResult.executedInAuction();
+            return MatchResult.executed(MatchingOutcome.EXECUTED_IN_AUCTION);
         }
-        return MatchResult.executed(null, null);
+        return MatchResult.executed(MatchingOutcome.EXECUTED);
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
@@ -117,6 +115,7 @@ public class Security {
                 return MatchResult.notEnoughPositions();
             }
         }
+
 
         int newQuantity = updateOrderRq.getQuantity();
         boolean quantityIncreased = order.isQuantityIncreased(newQuantity);
@@ -156,15 +155,18 @@ public class Security {
         if (currentMatchingState == MatchingState.AUCTION) {
             matchResult = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
+            // The
             matchResult = matcher.execute(order);
         }
+//        result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT
 
         // TODO: do we check in else statement, it will decreaseCredit????
+        // TODO : In if kheili kirie
         if (matchResult.outcome() != MatchingOutcome.EXECUTED
                 && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             orderBook.enqueue(originalOrder);
             if (updateOrderRq.getSide() == Side.BUY) {
-                if (originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {
+                if (!originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {
                     return MatchResult.notEnoughCredit();
                 }
                 // TODO: note that we already deceased Credit in both executes
@@ -183,7 +185,7 @@ public class Security {
             trades = matcher.auctionMatch(orderBook);
 
             if (trades.isEmpty()) {
-                return MatchResult.executedInAuction();
+                return MatchResult.executed();
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
 
@@ -201,7 +203,7 @@ public class Security {
                 }
                 trades.addAll(matchResult.trades());
             }
-            return MatchResult.executedInAuction(trades);
+            return MatchResult.executed(trades);
         }
         this.currentMatchingState = newMatchingState;
         return matchResult;

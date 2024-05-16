@@ -201,8 +201,9 @@ public class Matcher {
         int prevQuantity = order.getQuantity();
         MatchResult result = match(order);
 
-        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT)
+        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
             return result;
+        }
 
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
             if (order.getSide() == Side.BUY)
@@ -247,6 +248,6 @@ public class Matcher {
 
         calculateReopeningPrice(orderBook);
 
-        return MatchResult.executedInAuction();
+        return MatchResult.executed();
     }
 }

@@ -38,25 +38,19 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION, null, new LinkedList<>());
     }
 
-    public static MatchResult executedInAuction(List<Trade> trades) {
-        if (trades == null){
-            return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
-        }
+    public static MatchResult executed(List<Trade> trades) {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>(trades));
     }
 
-    public static MatchResult executedInAuction() {
+    public static MatchResult executed() {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
-
-//    public MatchResult matchedInAuction(LinkedList<Trade> trades_) {
-//        this.trades = trades_;
-//        return new TradeEvent();
-////        return executedInAuction();
-//    }
-
-//eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(),
-//trade.getQuantity(), trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
+    public static MatchResult executed(MatchingOutcome outcome) {
+        return (outcome == MatchingOutcome.EXECUTED_IN_AUCTION)
+                ? new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>())
+                : new MatchResult(MatchingOutcome.EXECUTED, null, new LinkedList<>());
+//        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
+    }
 
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
