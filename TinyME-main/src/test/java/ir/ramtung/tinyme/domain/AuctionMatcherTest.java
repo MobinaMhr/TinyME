@@ -363,18 +363,15 @@ public class AuctionMatcherTest {
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.CONTINUOUS);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
                 2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 250);
+                shareholder.getShareholderId(), 0, 15850);
 
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
         changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        System.out.println("________________________________________________________________________-");
 
         EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(),
                 2, LocalDateTime.now(), Side.BUY, 200, 15900, testBroker.getBrokerId(),
