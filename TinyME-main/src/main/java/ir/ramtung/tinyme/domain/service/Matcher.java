@@ -137,8 +137,11 @@ public class Matcher {
         LinkedList<Trade> trades = new LinkedList<>();
         for (var buyOrder : buyQueue) {
 
-            while (!sellQueue.isEmpty() && buyOrder.getQuantity() > 0) {
-                Order matchingSellOrder = sellQueue.getFirst();
+            for (Order matchingSellOrder : sellQueue){
+
+                if (buyOrder.getQuantity() < 0){
+                    break;
+                }
 
                 Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice,
                         Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
