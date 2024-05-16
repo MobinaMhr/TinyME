@@ -295,7 +295,7 @@ public class AuctionMatcherTest {
     }
 
     //////////////////////////////////////// new tests ////////////////////////////////////////
-    @Test
+    @Test // TODO :: should be allowed
     void check_if_updating_MEQ_order_is_not_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
@@ -326,7 +326,7 @@ public class AuctionMatcherTest {
         assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
     }
 
-    @Test
+    @Test // TODO :: should be allowed when active and should be rejected when inactive
     void check_if_updating_stop_limit_order_order_is_not_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
