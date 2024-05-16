@@ -65,6 +65,7 @@ public class AuctionMatcherTest {
         security = Security.builder().isin("ABC").build();
 
         broker = Broker.builder().credit(MAIN_BROKER_CREDIT).brokerId(1).build();
+        brokerRepository.addBroker(broker);
         shareholder = Shareholder.builder().build();
         shareholderRepository.addShareholder(shareholder);
         shareholder.incPosition(security, 100_000);
@@ -135,7 +136,8 @@ public class AuctionMatcherTest {
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
+        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
+        
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
         brokerRepository.addBroker(testBroker);
