@@ -89,6 +89,9 @@ public class Security {
         Order order = null;
         order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
 
+        if(currentMatchingState == MatchingState.AUCTION && order != null){
+            throw new InvalidRequestException(Message.CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
+        }
         if (order == null) {
             order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         }
@@ -96,9 +99,7 @@ public class Security {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
 
-        if(order instanceof StopLimitOrder && currentMatchingState == MatchingState.AUCTION){
-            throw new InvalidRequestException(Message.CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
-        }
+
 
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
