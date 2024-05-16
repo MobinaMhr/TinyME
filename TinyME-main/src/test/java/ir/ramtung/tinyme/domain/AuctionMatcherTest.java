@@ -449,16 +449,38 @@ public class AuctionMatcherTest {
     }
 
     @Test
-    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
+    void check_if_update_matching_state_from_auction_to_continues_works_properly_when_not_causes_trades() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
+                security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        // rest
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
+
 
         changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.CONTINUOUS);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        // rest
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+    }
+
+    @Test
+    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+
+
     }
 
     @Test
@@ -466,12 +488,13 @@ public class AuctionMatcherTest {
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.CONTINUOUS);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        // rest
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
         changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        // rest
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
     }
 
     @Test
