@@ -85,44 +85,54 @@ public class Security {
         return MatchResult.executed(MatchingOutcome.EXECUTED);
     }
 
-    public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
-        Order order = null;
-        order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-
-        if(currentMatchingState == MatchingState.AUCTION && order != null) {
+    private Order findOrder(EnterOrderRq updateOrderRq) throws InvalidRequestException {
+        Order order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
+        if (currentMatchingState == MatchingState.AUCTION && order != null) {
             throw new InvalidRequestException(Message.CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
+
         if (order == null) {
             order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         }
+
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
 
-        if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
+        return order;
+    }
+    private void validateOrder(EnterOrderRq updateOrderRq, Order order) throws InvalidRequestException {
+        if (order instanceof IcebergOrder && updateOrderRq.getPeakSize() == 0) {
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
-        if (!(order instanceof IcebergOrder) && updateOrderRq.getPeakSize() != 0)
-            throw new InvalidRequestException(Message.CANNOT_SPECIFY_PEAK_SIZE_FOR_A_NON_ICEBERG_ORDER);
-        if (order.getMinimumExecutionQuantity() != updateOrderRq.getMinimumExecutionQuantity())
-            throw new InvalidRequestException(Message.CANNOT_CHANGE_MEQ_DURING_UPDATE);
-
-        if (updateOrderRq.getSide() == Side.SELL) {
-            int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
-                    - order.getQuantity()
-                    + updateOrderRq.getQuantity();
-            if (!order.getShareholder().hasEnoughPositionsOn(this, position)) {
-                return MatchResult.notEnoughPositions();
-            }
         }
 
-        int newQuantity = updateOrderRq.getQuantity();
-        boolean quantityIncreased = order.isQuantityIncreased(newQuantity);
-        boolean losesPriority = doesLosePriority(updateOrderRq, order, quantityIncreased);
+        if (!(order instanceof IcebergOrder) && updateOrderRq.getPeakSize() != 0) {
+            throw new InvalidRequestException(Message.CANNOT_SPECIFY_PEAK_SIZE_FOR_A_NON_ICEBERG_ORDER);
+        }
 
+        if (order.getMinimumExecutionQuantity() != updateOrderRq.getMinimumExecutionQuantity()) {
+            throw new InvalidRequestException(Message.CANNOT_CHANGE_MEQ_DURING_UPDATE);
+        }
+    }
+    private boolean doesHaveEnoughPosition(EnterOrderRq updateOrderRq, Order order) {
+        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
+                - order.getQuantity()
+                + updateOrderRq.getQuantity();
+        return order.getShareholder().hasEnoughPositionsOn(this, position);
+    }
+    public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
+        Order order = findOrder(updateOrderRq);
+        validateOrder(updateOrderRq, order);
+        if (updateOrderRq.getSide() == Side.SELL
+                && !doesHaveEnoughPosition(updateOrderRq, order)) {
+            return MatchResult.notEnoughPositions();
+        }
         if (updateOrderRq.getSide() == Side.BUY) {
             order.getBroker().increaseCreditBy(order.getValue());
         }
 
+        boolean quantityIncreased = order.isQuantityIncreased(updateOrderRq.getQuantity());
+        boolean losesPriority = doesLosePriority(updateOrderRq, order, quantityIncreased);
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
 
@@ -140,7 +150,6 @@ public class Security {
             return MatchResult.executed(null, List.of());
         }
 
-        // if (losesPriority) :
         orderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
 
@@ -148,13 +157,9 @@ public class Security {
         if (currentMatchingState == MatchingState.AUCTION) {
             matchResult = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
-            // The
             matchResult = matcher.execute(order);
         }
-//        result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT
 
-        // TODO: do we check in else statement, it will decreaseCredit????
-        // TODO : In if kheili kirie
         if (matchResult.outcome() != MatchingOutcome.EXECUTED
                 && matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             orderBook.enqueue(originalOrder);
@@ -162,7 +167,6 @@ public class Security {
                 if (!originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {
                     return MatchResult.notEnoughCredit();
                 }
-                // TODO: note that we already deceased Credit in both executes
                 originalOrder.getBroker().decreaseCreditBy(originalOrder.getValue());
             }
         }
