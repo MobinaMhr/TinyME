@@ -401,10 +401,49 @@ public class AuctionMatcherTest {
 
     @Test
     void check_if_update_matching_state_from_auction_to_continuous_works_properly() {
+
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
                 security.getIsin(), MatchingState.CONTINUOUS);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        // rest
+
+        verify(eventPublisher,times(1)).publish(any(TradeEvent.class));
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15810);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
+        assertThat(orderBook.findByOrderId(Side.BUY,7)).isNull();
+
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRqWithStopPrice(4, security.getIsin(), 4,
+                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15810);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
+
+        verify(eventPublisher,times(2)).publish(any(OrderAcceptedEvent.class));
+        verify(eventPublisher,times(1)).publish(any(OrderExecutedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,4)).isNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,4)).isNull();
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15820 - 100 * 15810);
+        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15820 + 100 * 15810);
+        assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
+
     }
 
     @Test
