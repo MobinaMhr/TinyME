@@ -182,6 +182,7 @@ public class Security {
             matcher.calculateReopeningPrice(orderBook);
             LinkedList<Trade> trades = matcher.auctionMatch(orderBook);
             if (trades.isEmpty()) {
+                this.currentMatchingState = newMatchingState;
                 return MatchResult.executed();
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
