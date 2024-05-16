@@ -296,7 +296,7 @@ public class AuctionMatcherTest {
 
     //////////////////////////////////////// new tests ////////////////////////////////////////
     @Test
-    void check_if_updating_MEQ_order_is_allowed_in_auction_state() {
+    void check_if_updating_MEQ_amount_in_MEQ_order_is_not_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
         brokerRepository.addBroker(testBroker);
@@ -323,13 +323,71 @@ public class AuctionMatcherTest {
                 3, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 0, 250);
 
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+    }
+    @Test
+    void check_if_updating_quantity_in_MEQ_order_is_allowed_in_auction_state() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 350, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 150);
+
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 150);
+
         assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
 //
 //        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
     }
 
-    @Test // TODO :: should be allowed when active and should be rejected when inactive
-    void check_if_updating_stop_limit_order_order_is_not_allowed_in_auction_state() {
+    @Test // TODO
+    void check_if_updating_inactive_stop_limit_order_is_not_allowed_in_auction_state() {
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 250);
+
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+    }
+
+    @Test // TODO
+    void check_if_updating_active_stop_limit_order_is_allowed_in_auction_state() {
         int testBrokerCredit = 20_000_000;
         Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
         brokerRepository.addBroker(testBroker);
