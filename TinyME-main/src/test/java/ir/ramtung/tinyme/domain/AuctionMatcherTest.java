@@ -367,6 +367,7 @@ public class AuctionMatcherTest {
                 shareholder.getShareholderId(), 0);
 
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
 
 
         changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
@@ -380,9 +381,6 @@ public class AuctionMatcherTest {
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 200 * 15820);
         assertThat(orderBook.findByOrderId(Side.BUY,7)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
-
-        //TODO:: change in opening price event
-        // rest
     }
 
     @Test
@@ -398,8 +396,7 @@ public class AuctionMatcherTest {
                 security.getIsin(), MatchingState.AUCTION);
         orderHandler.handleChangeMatchingStateRq(changeStateRq);
         verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
-        //TODO:: change in opening price event
-        // rest
+
     }
 
     @Test
