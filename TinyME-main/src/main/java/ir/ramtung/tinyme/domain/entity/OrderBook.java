@@ -29,6 +29,28 @@ public class OrderBook {
         it.add(order);
     }
 
+    public LinkedList<Order> getOpeningSellOrders(int openingPrice){
+        LinkedList<Order> result = new LinkedList<>();
+        for (var order : sellQueue){
+            if(order.getPrice() <= openingPrice){
+                result.add(order);
+            }
+        }
+
+        return result;
+    }
+
+    public LinkedList<Order> getOpeningBuyOrders(int openingPrice){
+        LinkedList<Order> result = new LinkedList<>();
+        for (var order : buyQueue){
+            if(order.getPrice() >= openingPrice){
+                result.add(order);
+            }
+        }
+
+        return result;
+    }
+
     private LinkedList<Order> getQueue(Side side) {
         return side == Side.BUY ? buyQueue : sellQueue;
     }

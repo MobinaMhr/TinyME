@@ -120,104 +120,53 @@ public class Matcher {
     }
 
     private LinkedList<Trade> auctionMatch(OrderBook orderBook) {
-        LinkedList<Order> sellQueue = new LinkedList<>();
-        for (var order : orderBook.getSellQueue()) {
-            if (this.reopeningPrice < order.getPrice())
-                continue;
-            sellQueue.add(order);
-        }
-
-        LinkedList<Order> buyQueue = new LinkedList<>();
-        for (var order : orderBook.getBuyQueue()) {
-            if (this.reopeningPrice > order.getPrice())
-                continue;
-            buyQueue.add(order);
-        }
-
+        // maybe recalculate
         LinkedList<Trade> trades = new LinkedList<>();
-        for (var buyOrder : buyQueue) {
 
-            for (Order matchingSellOrder : sellQueue){
+        while (true){
+            LinkedList<Order> buyOrders = orderBook.getOpeningBuyOrders(this.reopeningPrice);
+            LinkedList<Order> sellOrders = orderBook.getOpeningSellOrders(this.reopeningPrice);
 
-                if (buyOrder.getQuantity() < 0){
-                    break;
-                }
-
-                Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice,
-                        Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
-                        buyOrder, matchingSellOrder);
-
-                buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
-                trade.decreaseBuyersCredit();
-                trade.increaseSellersCredit();
-                trades.add(trade);
-
-                int tradedQuantity = 0;
-                if (buyOrder instanceof IcebergOrder buyIOrder &&
-                        matchingSellOrder instanceof IcebergOrder sellIOrder) {
-                    tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), sellIOrder.getDisplayedQuantity());
-                    buyIOrder.decreaseQuantity(tradedQuantity);
-                    if (buyIOrder.getDisplayedQuantity() == 0) {
-                        buyIOrder.replenish();
-                        // Change priority TODO
-                    }
-                    sellIOrder.decreaseQuantity(tradedQuantity);
-                    if (sellIOrder.getDisplayedQuantity() == 0) {
-                        sellIOrder.replenish();
-                        // Change priority TODO
-                    }
-                }
-                else if (buyOrder instanceof IcebergOrder buyIOrder) {
-                    tradedQuantity = Math.min(buyIOrder.getDisplayedQuantity(), matchingSellOrder.getQuantity());
-                    buyIOrder.decreaseQuantity(tradedQuantity);
-                    if (buyIOrder.getDisplayedQuantity() == 0) {
-                        buyIOrder.replenish();
-                        // Change priority TODO
-                    }
-                    matchingSellOrder.decreaseQuantity(tradedQuantity);
-                }
-                else if (matchingSellOrder instanceof IcebergOrder sellIOrder) {
-                    tradedQuantity = Math.min(buyOrder.getQuantity(), sellIOrder.getDisplayedQuantity());
-                    buyOrder.decreaseQuantity(tradedQuantity);
-                    sellIOrder.decreaseQuantity(tradedQuantity);
-                    if (sellIOrder.getDisplayedQuantity() == 0) {
-                        sellIOrder.replenish();
-                        // Change priority TODO
-                    }
-                }
-                else {
-                    tradedQuantity = Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity());
-                    buyOrder.decreaseQuantity(tradedQuantity);
-                    matchingSellOrder.decreaseQuantity(tradedQuantity);
-                }
-
-                // if value = 0 nothing changes :
-                buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
-                matchingSellOrder.getBroker().decreaseCreditBy(matchingSellOrder.getValue());
+            if (buyOrders.isEmpty() || sellOrders.isEmpty()){
+                break;
             }
-        }
 
-        Iterator<Order> iterator;
-        iterator = orderBook.getSellQueue().iterator();
-        while (iterator.hasNext()) {
-            Order currentOrder = iterator.next();
-            if (currentOrder instanceof IcebergOrder icebergOrder &&
-                    icebergOrder.getDisplayedQuantity() == 0) {
-                iterator.remove();
-            } else if (currentOrder.getQuantity() == 0) {
-                iterator.remove();
-            }
-        }
+            Order buyOrder = buyOrders.getFirst();
+            Order matchingSellOrder = sellOrders.getFirst();
+            Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice,
+                    Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
+                    buyOrder, matchingSellOrder);
 
-        iterator = orderBook.getBuyQueue().iterator();
-        while (iterator.hasNext()) {
-            Order currentOrder = iterator.next();
-            if (currentOrder instanceof IcebergOrder icebergOrder &&
-                    icebergOrder.getDisplayedQuantity() == 0) {
-                iterator.remove();
-            } else if (currentOrder.getQuantity() == 0) {
-                iterator.remove();
+            buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
+            trade.decreaseBuyersCredit();
+            trade.increaseSellersCredit();
+            trades.add(trade);
+
+            int tradedQuantity = 0;
+            tradedQuantity = Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity());
+            buyOrder.decreaseQuantity(tradedQuantity);
+            matchingSellOrder.decreaseQuantity(tradedQuantity);
+
+            if (buyOrder.getQuantity() == 0){
+                orderBook.removeByOrderId(Side.BUY,buyOrder.getOrderId());
+                if (buyOrder instanceof IcebergOrder buyIOrder){
+                    buyIOrder.replenish();
+                    if (buyIOrder.getQuantity() > 0){
+                        orderBook.enqueue(buyIOrder);
+                    }
+                }
             }
+
+            if (matchingSellOrder.getQuantity() == 0){
+                orderBook.removeByOrderId(Side.SELL,matchingSellOrder.getOrderId());
+                if (matchingSellOrder instanceof IcebergOrder sellIOrder){
+                    sellIOrder.replenish();
+                    if (sellIOrder.getQuantity() > 0){
+                        orderBook.enqueue(sellIOrder);
+                    }
+                }
+            }
+            buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
         return trades;
     }
