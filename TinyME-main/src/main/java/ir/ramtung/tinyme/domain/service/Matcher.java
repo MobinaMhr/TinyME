@@ -122,14 +122,17 @@ public class Matcher {
             this.reopeningPrice = lastTradePrice;
     }
 
-    public void removeOrdersWithZeroQuantity(Order order, Side side, OrderBook orderBook){
-        if (order.getQuantity() == 0){
-            orderBook.removeByOrderId(side, order.getOrderId());
-            if (order instanceof IcebergOrder iOrder){
-                iOrder.replenish();
-                if (iOrder.getQuantity() > 0){
-                    orderBook.enqueue(iOrder);
-                }
+    public void removeOrdersWithZeroQuantity(Order order, Side side, OrderBook orderBook) {
+        if (order.getQuantity() != 0) {
+            return;
+        }
+
+        orderBook.removeByOrderId(side, order.getOrderId());
+
+        if (order instanceof IcebergOrder iOrder){
+            iOrder.replenish();
+            if (iOrder.getQuantity() > 0){
+                orderBook.enqueue(iOrder);
             }
         }
     }
@@ -143,10 +146,10 @@ public class Matcher {
                 break;
 
             Order buyOrder = buyOrders.getFirst();
-            Order matchingSellOrder = sellOrders.getFirst();
+            Order sellOrder = sellOrders.getFirst();
             Trade trade = new Trade(buyOrder.getSecurity(), this.reopeningPrice,
-                    Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity()),
-                    buyOrder, matchingSellOrder);
+                    Math.min(buyOrder.getQuantity(), sellOrder.getQuantity()),
+                    buyOrder, sellOrder);
 
             buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
             trade.decreaseBuyersCredit();
@@ -154,13 +157,13 @@ public class Matcher {
             trades.add(trade);
 
             int tradedQuantity = 0;
-            tradedQuantity = Math.min(buyOrder.getQuantity(), matchingSellOrder.getQuantity());
+            tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
             buyOrder.decreaseQuantity(tradedQuantity);
-            matchingSellOrder.decreaseQuantity(tradedQuantity);
+            sellOrder.decreaseQuantity(tradedQuantity);
 
 
             removeOrdersWithZeroQuantity(buyOrder, Side.BUY, orderBook);
-            removeOrdersWithZeroQuantity(matchingSellOrder, Side.SELL, orderBook);
+            removeOrdersWithZeroQuantity(sellOrder, Side.SELL, orderBook);
 
             buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
