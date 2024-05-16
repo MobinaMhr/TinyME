@@ -89,8 +89,8 @@ public class Security {
         Order order = null;
         order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
 
-        if(currentMatchingState == MatchingState.AUCTION && order != null){
-            throw new InvalidRequestException(Message.CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
+        if(currentMatchingState == MatchingState.AUCTION && order != null) {
+            throw new InvalidRequestException(Message.CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
         if (order == null) {
             order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
@@ -98,8 +98,6 @@ public class Security {
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
-
-
 
         if ((order instanceof IcebergOrder) && updateOrderRq.getPeakSize() == 0)
             throw new InvalidRequestException(Message.INVALID_PEAK_SIZE);
@@ -117,16 +115,9 @@ public class Security {
             }
         }
 
-
         int newQuantity = updateOrderRq.getQuantity();
         boolean quantityIncreased = order.isQuantityIncreased(newQuantity);
-        double newPrice = updateOrderRq.getPrice();
-        boolean priceChanged = newPrice != order.getPrice();
-        boolean peakSizeIncreased = order instanceof IcebergOrder icebergOrder
-                && icebergOrder.getPeakSize() < updateOrderRq.getPeakSize();
-        boolean stopPriceChanged = order instanceof StopLimitOrder stopLimitOrder
-                && stopLimitOrder.getStopPrice() != updateOrderRq.getStopPrice();
-        boolean losesPriority = quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged;
+        boolean losesPriority = doesLosePriority(updateOrderRq, order, quantityIncreased);
 
         if (updateOrderRq.getSide() == Side.BUY) {
             order.getBroker().increaseCreditBy(order.getValue());
@@ -143,6 +134,7 @@ public class Security {
             }
             if (currentMatchingState == MatchingState.AUCTION) {
                 matcher.calculateReopeningPrice(orderBook);
+                return MatchResult.executed(); // TODO
                 // return this result
             }
             return MatchResult.executed(null, List.of());
@@ -175,6 +167,17 @@ public class Security {
             }
         }
         return matchResult;
+    }
+
+    private static boolean doesLosePriority(EnterOrderRq updateOrderRq, Order order, boolean quantityIncreased) {
+        double newPrice = updateOrderRq.getPrice();
+        boolean priceChanged = newPrice != order.getPrice();
+        boolean peakSizeIncreased = order instanceof IcebergOrder icebergOrder
+                && icebergOrder.getPeakSize() < updateOrderRq.getPeakSize();
+        boolean stopPriceChanged = order instanceof StopLimitOrder stopLimitOrder
+                && stopLimitOrder.getStopPrice() != updateOrderRq.getStopPrice();
+
+        return quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged;
     }
 
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {

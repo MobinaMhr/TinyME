@@ -3,6 +3,7 @@ package ir.ramtung.tinyme.domain.service;
 import ir.ramtung.tinyme.domain.entity.*;
 import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -10,6 +11,7 @@ import java.util.*;
 @Getter
 @Service
 public class Matcher {
+    @Setter
     private int lastTradePrice;
     //Default values
     public int reopeningPrice = 0;
@@ -20,9 +22,6 @@ public class Matcher {
             return;
         }
         lastTradePrice = result.trades().getLast().getPrice();
-    }
-    public void setLastTradePrice(int price) {
-        lastTradePrice = price;
     }
 
     public MatchResult match(Order newOrder) {

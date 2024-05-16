@@ -22,7 +22,7 @@ public class Message {
     public static final String ORDER_CANNOT_BE_ICEBERG_AND_STOP_LIMIT = "Order cannot be iceberg and stop limit";
     public static final String ORDER_CANNOT_HAVE_MEQ_AND_BE_STOP_LIMIT = "Order cannot have minimum execution quantity and be stop limit";
     public static final String MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY = "Minimum execution quantity cannot be more than order quantity";
-    public static final String CANNOT_UPDATE_STOP_LIMIT_ORDER_IN_AUCTION_MODE = "cannot update stop limit order in auction mode";
+    public static final String CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE = "cannot update stop limit order in auction mode";
     public static final String CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE = "cannot delete stop limit order in auction mode";
     public static final String INVALID_TARGET_MATCHING_STATE = "invalid_target_matching_state";
 }
