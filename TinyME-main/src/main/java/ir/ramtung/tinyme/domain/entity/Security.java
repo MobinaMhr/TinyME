@@ -65,12 +65,12 @@ public class Security {
     }
 
     public MatchResult deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
-        Order order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null) {
-            order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-            if(order != null && currentMatchingState == MatchingState.AUCTION){
-                throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
-            }
+            order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        }
+        else if(currentMatchingState == MatchingState.AUCTION){
+            throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
@@ -180,9 +180,7 @@ public class Security {
         MatchResult matchResult = null;
         if (this.currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
-
             LinkedList<Trade> trades = matcher.auctionMatch(orderBook);
-
             if (trades.isEmpty()) {
                 return MatchResult.executed();
             }

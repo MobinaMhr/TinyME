@@ -58,6 +58,12 @@ public class OrderHandler {
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
             return true;
         }
+        if (matchResult.outcome() == MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION){
+            return true;
+        }
+        if (matchResult.outcome() == MatchingOutcome.STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION){
+            return true;
+        }
         if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER)
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
         else
