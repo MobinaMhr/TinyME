@@ -122,17 +122,25 @@ public class Matcher {
             this.reopeningPrice = lastTradePrice;
     }
 
-    public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
-        // maybe recalculate
-        LinkedList<Trade> trades = new LinkedList<>();
+    public void removeOrdersWithZeroQuantity(Order order, Side side, OrderBook orderBook){
+        if (order.getQuantity() == 0){
+            orderBook.removeByOrderId(side, order.getOrderId());
+            if (order instanceof IcebergOrder iOrder){
+                iOrder.replenish();
+                if (iOrder.getQuantity() > 0){
+                    orderBook.enqueue(iOrder);
+                }
+            }
+        }
+    }
 
+    public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
+        LinkedList<Trade> trades = new LinkedList<>();
         while (true){
             LinkedList<Order> buyOrders = orderBook.getOpeningBuyOrders(this.reopeningPrice);
             LinkedList<Order> sellOrders = orderBook.getOpeningSellOrders(this.reopeningPrice);
-
-            if (buyOrders.isEmpty() || sellOrders.isEmpty()){
+            if (buyOrders.isEmpty() || sellOrders.isEmpty())
                 break;
-            }
 
             Order buyOrder = buyOrders.getFirst();
             Order matchingSellOrder = sellOrders.getFirst();
@@ -150,25 +158,10 @@ public class Matcher {
             buyOrder.decreaseQuantity(tradedQuantity);
             matchingSellOrder.decreaseQuantity(tradedQuantity);
 
-            if (buyOrder.getQuantity() == 0){
-                orderBook.removeByOrderId(Side.BUY,buyOrder.getOrderId());
-                if (buyOrder instanceof IcebergOrder buyIOrder){
-                    buyIOrder.replenish();
-                    if (buyIOrder.getQuantity() > 0){
-                        orderBook.enqueue(buyIOrder);
-                    }
-                }
-            }
 
-            if (matchingSellOrder.getQuantity() == 0){
-                orderBook.removeByOrderId(Side.SELL,matchingSellOrder.getOrderId());
-                if (matchingSellOrder instanceof IcebergOrder sellIOrder){
-                    sellIOrder.replenish();
-                    if (sellIOrder.getQuantity() > 0){
-                        orderBook.enqueue(sellIOrder);
-                    }
-                }
-            }
+            removeOrdersWithZeroQuantity(buyOrder, Side.BUY, orderBook);
+            removeOrdersWithZeroQuantity(matchingSellOrder, Side.SELL, orderBook);
+
             buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
         return trades;
@@ -201,9 +194,8 @@ public class Matcher {
         int prevQuantity = order.getQuantity();
         MatchResult result = match(order);
 
-        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
+        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT)
             return result;
-        }
 
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
             if (order.getSide() == Side.BUY)
@@ -227,7 +219,6 @@ public class Matcher {
             order.getSecurity().getOrderBook().enqueue(result.remainder());
         }
 
-        // Will it crash when result.trades() is null?
         for (Trade trade : result.trades()) {
             trade.getBuy().getShareholder().incPosition(trade.getSecurity(), trade.getQuantity());
             trade.getSell().getShareholder().decPosition(trade.getSecurity(), trade.getQuantity());
