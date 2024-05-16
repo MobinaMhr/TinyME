@@ -27,36 +27,36 @@ public class Security {
     @Builder.Default
     private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
+    private Order createNewOrderInstance(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder) {
+        if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0)
+            return new Order(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
+                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder, enterOrderRq.getEntryTime(),
+                    OrderStatus.NEW, enterOrderRq.getMinimumExecutionQuantity());
+        else if (enterOrderRq.getPeakSize() > 0 && enterOrderRq.getStopPrice() == 0)
+            return new IcebergOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
+                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
+                    enterOrderRq.getEntryTime(), enterOrderRq.getPeakSize(), OrderStatus.NEW,
+                    enterOrderRq.getMinimumExecutionQuantity());
+        else
+            return new StopLimitOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
+                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
+                    enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
+    }
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
                         orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
             return MatchResult.notEnoughPositions();
 
-        Order order;
-        if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0)
-            order = new Order(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
-                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder, enterOrderRq.getEntryTime(),
-                    OrderStatus.NEW, enterOrderRq.getMinimumExecutionQuantity());
-        else if (enterOrderRq.getPeakSize() > 0 && enterOrderRq.getStopPrice() == 0)
-            order = new IcebergOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
-                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
-                    enterOrderRq.getEntryTime(), enterOrderRq.getPeakSize(), OrderStatus.NEW,
-                    enterOrderRq.getMinimumExecutionQuantity());
-        else
-            order = new StopLimitOrder(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),
-                    enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
-                    enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
-
+        Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
 
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
-            if (order instanceof StopLimitOrder) {
+            if (order instanceof StopLimitOrder)
                 return MatchResult.stopLimitOrderIsNotAllowedInAuction();
-            }
-            if (order.getMinimumExecutionQuantity() > 0) {
+            if (order.getMinimumExecutionQuantity() > 0)
                 return MatchResult.meqOrderIsNotAllowedInAuction();
-            }
+
             result = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
