@@ -400,9 +400,53 @@ public class AuctionMatcherTest {
         //TODO:: change in opening price event
         // rest
     }
-}
 
-//        System.out.println("LTP: " + matcher.getLastTradePrice());
-//        System.out.println("RP: " + matcher.getReopeningPrice());
-//        System.out.println("Sell: " + security.getOrderBook().getSellQueue());
-//        System.out.println("Buy: " + security.getOrderBook().getBuyQueue());
+    @Test
+    void check_if_update_matching_state_from_auction_to_continuous_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_update_matching_state_from_continuous_to_auction_works_properly() {
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.CONTINUOUS);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+
+        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        // rest
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_entering_new_order() {
+        //
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_updating_order() {
+        //
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_deleting_order() {
+        //
+    }
+}
