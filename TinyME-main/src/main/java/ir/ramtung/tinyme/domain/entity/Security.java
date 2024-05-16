@@ -30,7 +30,7 @@ public class Security {
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
-                orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
+                        orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
             return MatchResult.notEnoughPositions();
 
         Order order;
@@ -181,8 +181,7 @@ public class Security {
         if (this.currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
 
-            LinkedList<Trade> trades = null;
-            trades = matcher.auctionMatch(orderBook);
+            LinkedList<Trade> trades = matcher.auctionMatch(orderBook);
 
             if (trades.isEmpty()) {
                 return MatchResult.executed();
