@@ -102,23 +102,17 @@ public class OrderHandler {
             validateChangeMatchingStateRq(changeMatchingStateRq);
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-//            LinkedList<Trade> trades =
             MatchResult result = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
-            // There is no check for true or false, would it cause some bug in test file??????
-            System.out.println("/////////////////////////////////1");
             eventPublisher.publish(new SecurityStateChangedEvent(changeMatchingStateRq.getSecurityIsin(),
                     changeMatchingStateRq.getTargetState()));
-            System.out.println("/////////////////////////////////2");
             if (result == null || result.trades() == null) {
                 return;
             }
-            System.out.println("/////////////////////////////////3");
             for (Trade trade : result.trades()) {
                 eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(), trade.getQuantity(),
                         trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
             }
         } catch (InvalidRequestException ex) {
-            System.out.println("/////////////////////////////////damn");
             eventPublisher.publish(new ChangeMatchingStateRqRejectedEvent(
                     changeMatchingStateRq.getSecurityIsin(), changeMatchingStateRq.getTargetState()));
         }

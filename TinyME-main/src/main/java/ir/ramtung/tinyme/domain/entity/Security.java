@@ -82,7 +82,7 @@ public class Security {
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
-            return MatchResult.executedInAuction(null);
+            return MatchResult.executedInAuction();
         }
         return MatchResult.executed(null, null);
     }
@@ -183,7 +183,7 @@ public class Security {
             trades = matcher.auctionMatch(orderBook);
 
             if (trades.isEmpty()) {
-                return MatchResult.executedInAuction(null);
+                return MatchResult.executedInAuction();
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
 

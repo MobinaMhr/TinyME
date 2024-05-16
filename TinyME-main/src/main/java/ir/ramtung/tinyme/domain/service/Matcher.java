@@ -246,7 +246,7 @@ public class Matcher {
         orderBook.enqueue(order);
 
         calculateReopeningPrice(orderBook);
-        LinkedList<Trade> trades = auctionMatch(orderBook);
-        return MatchResult.executedInAuction(trades);
+
+        return MatchResult.executedInAuction();
     }
 }

@@ -39,7 +39,14 @@ public final class MatchResult {
     }
 
     public static MatchResult executedInAuction(List<Trade> trades) {
+        if (trades == null){
+            return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
+        }
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>(trades));
+    }
+
+    public static MatchResult executedInAuction() {
+        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
 
 //    public MatchResult matchedInAuction(LinkedList<Trade> trades_) {
