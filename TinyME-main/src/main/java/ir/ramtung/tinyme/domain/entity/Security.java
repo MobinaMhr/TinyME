@@ -130,7 +130,7 @@ public class Security {
         boolean stopPriceChanged = order instanceof StopLimitOrder stopLimitOrder
                 && stopLimitOrder.getStopPrice() != updateOrderRq.getStopPrice();
 
-        return quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged;
+        return quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged ;
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
@@ -175,7 +175,8 @@ public class Security {
 
         assert matchResult != null;
         if (matchResult.outcome() != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE
-                && matchResult.outcome() != MatchingOutcome.EXECUTED) {
+                && matchResult.outcome() != MatchingOutcome.EXECUTED &&
+                    matchResult.outcome() != MatchingOutcome.EXECUTED_IN_AUCTION) {
             orderBook.enqueue(originalOrder);
             if (updateOrderRq.getSide() == Side.BUY) {
                 if (!originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue())) {

@@ -599,19 +599,34 @@ public class AuctionMatcherTest {
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15810);
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 80 * 15900 + 100 * 15810);
     }
-
-    @Test
-    void check_if_reopening_price_is_calculated_properly_after_entering_new_order() {
-        //
-    }
-
     @Test
     void check_if_reopening_price_is_calculated_properly_after_updating_order() {
-        //
-    }
 
-    @Test
-    void check_if_reopening_price_is_calculated_properly_after_deleting_order() {
-        //
+        int testBrokerCredit = 20_000_000;
+        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        brokerRepository.addBroker(testBroker);
+
+        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
+                security.getIsin(), MatchingState.AUCTION);
+        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 4,
+                LocalDateTime.now(), Side.BUY, 300, 15700, testBroker.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 300 * 15700);
+
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRq(5, security.getIsin(), 4,
+                LocalDateTime.now(), Side.BUY, 300, 15900, broker.getBrokerId(),
+                shareholder.getShareholderId(),0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(updateOrderRq));
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
+        verify(eventPublisher).publish(new OrderUpdatedEvent(5, 4));
+        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 300 * 15900);
+        assertThat(orderBook.findByOrderId(Side.BUY,4)).isNotNull();
+
     }
 }
