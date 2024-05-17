@@ -206,6 +206,8 @@ public class Security {
                 return MatchResult.executed();
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
+
+            matchResult = MatchResult.executed(trades);
         }
         this.currentMatchingState = newMatchingState;
         return matchResult;
