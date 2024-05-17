@@ -47,16 +47,13 @@ public class Security {
                 !shareholder.hasEnoughPositionsOn(this,
                         orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity()))
             return MatchResult.notEnoughPositions();
-
         Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
-
         MatchResult result = null;
         if (currentMatchingState == MatchingState.AUCTION) {
             if (order instanceof StopLimitOrder)
                 return MatchResult.stopLimitOrderIsNotAllowedInAuction();
             if (order.getMinimumExecutionQuantity() > 0)
                 return MatchResult.meqOrderIsNotAllowedInAuction();
-
             result = matcher.auctionExecute(order);
         } else if (currentMatchingState == MatchingState.CONTINUOUS) {
             result = matcher.execute(order);
@@ -65,6 +62,7 @@ public class Security {
     }
 
     public MatchResult deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
+        System.out.println("Step :: 1");
         Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null) {
             order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
@@ -72,16 +70,25 @@ public class Security {
         else if(currentMatchingState == MatchingState.AUCTION){
             throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
+        System.out.println("Step :: 2");
         if (order == null)
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
-        if (order.getSide() == Side.BUY)
+        System.out.println("Step :: 3");
+        if (order.getSide() == Side.BUY) {
+            System.out.println("Step :: 3 :: 1");
             order.getBroker().increaseCreditBy(order.getValue());
+        }
+        System.out.println("Step :: 4");
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        System.out.println("Step :: 5");
         if (currentMatchingState == MatchingState.AUCTION) {
+            System.out.println("Step :: 5 :: 1");
             matcher.calculateReopeningPrice(orderBook);
+            System.out.println("Step :: 5 :: 1");
             return MatchResult.executed(MatchingOutcome.EXECUTED_IN_AUCTION);
         }
+        System.out.println("Step :: 6");
         return MatchResult.executed(MatchingOutcome.EXECUTED);
     }
 
