@@ -250,15 +250,14 @@ public class StopLimitOrderTest {
         EnterOrderRq enterOrderRq3 = EnterOrderRq.createNewOrderRq(6, security.getIsin(), 5,
                 LocalDateTime.now(), Side.BUY, 10, 15810, 2,
                 shareholder.getShareholderId(), 0);
-
         orderHandler.handleEnterOrder(enterOrderRq);
         verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
         orderHandler.handleEnterOrder(enterOrderRq2);
         verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
         orderHandler.handleEnterOrder(enterOrderRq3);
 
-        verify(eventPublisher).publish(new OrderActivateEvent(6, 4));
-        verify(eventPublisher).publish(new OrderActivateEvent(6, 3));
+        verify(eventPublisher).publish(new OrderActivateEvent(5, 4));
+        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
 
         verify(eventPublisher,times(3)).publish(any(OrderExecutedEvent.class));
 
@@ -291,7 +290,7 @@ public class StopLimitOrderTest {
         verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
         verify(eventPublisher).publish(new OrderActivateEvent(5, 4));
         verify(eventPublisher,times(2)).publish(any(OrderExecutedEvent.class));
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
+        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15820 + 100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (90 * 15820 + 100 * 15810 + 10 * 15820));
@@ -381,7 +380,7 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), 15790);
         orderHandler.handleEnterOrder(updateOrderRq);
         verify(eventPublisher).publish(new OrderActivateEvent(5, 2));
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 3));
+        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
         verify(eventPublisher,times(2)).publish(any(OrderExecutedEvent.class));
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 2)).isNull();

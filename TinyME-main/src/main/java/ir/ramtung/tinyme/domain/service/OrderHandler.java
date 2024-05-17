@@ -14,6 +14,7 @@ import ir.ramtung.tinyme.repository.ShareholderRepository;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public class OrderHandler {
     ShareholderRepository shareholderRepository;
     EventPublisher eventPublisher;
     Matcher matcher;
+    public HashMap<Long, Long> orderIdRqIdMap;
 
     public OrderHandler(SecurityRepository securityRepository, BrokerRepository brokerRepository,
                         ShareholderRepository shareholderRepository, EventPublisher eventPublisher, Matcher matcher) {
@@ -33,6 +35,7 @@ public class OrderHandler {
         this.shareholderRepository = shareholderRepository;
         this.eventPublisher = eventPublisher;
         this.matcher = matcher;
+        this.orderIdRqIdMap = new HashMap<Long, Long>();
     }
 
     public boolean resultPublisher(MatchResult matchResult, EnterOrderRq enterOrderRq, boolean isTypeStopLimitOrder, Security security) {
@@ -58,6 +61,7 @@ public class OrderHandler {
         }
         if (matchResult.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE){
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+            orderIdRqIdMap.put(enterOrderRq.getOrderId(), enterOrderRq.getRequestId());
             return true;
         }
         if (matchResult.outcome() == MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION){
@@ -68,9 +72,11 @@ public class OrderHandler {
         }
         if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
             eventPublisher.publish(new OrderAcceptedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+            orderIdRqIdMap.put(enterOrderRq.getOrderId(), enterOrderRq.getRequestId());
         }
         else {
             eventPublisher.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
+            orderIdRqIdMap.put(enterOrderRq.getOrderId(), enterOrderRq.getRequestId());
         }
 
         if (!matchResult.trades().isEmpty()) {
@@ -82,7 +88,6 @@ public class OrderHandler {
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
         try {
             validateEnterOrderRq(enterOrderRq);
-
             Security security = securityRepository.findSecurityByIsin(enterOrderRq.getSecurityIsin());
             Broker broker = brokerRepository.findBrokerById(enterOrderRq.getBrokerId());
             Shareholder shareholder = shareholderRepository.findShareholderById(enterOrderRq.getShareholderId());
@@ -136,12 +141,12 @@ public class OrderHandler {
                 return;
             }
             if(matchResult.outcome() == MatchingOutcome.EXECUTED){
-                eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(),
-                        matchResult.remainder().getOrderId()));
+                eventPublisher.publish(new OrderActivateEvent(orderIdRqIdMap.get(matchResult.remainder().getOrderId()),
+                        activatedOrder.getOrderId()));
             }
             if (!matchResult.trades().isEmpty()) {
-                eventPublisher.publish(new OrderExecutedEvent(enterOrderRq.getRequestId(),
-                        enterOrderRq.getOrderId(),
+                eventPublisher.publish(new OrderExecutedEvent(orderIdRqIdMap.get(activatedOrder.getOrderId()),
+                        activatedOrder.getOrderId(),
                         matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
             }
         }
@@ -152,6 +157,7 @@ public class OrderHandler {
             Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
             security.deleteOrder(deleteOrderRq, matcher);
             eventPublisher.publish(new OrderDeletedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId()));
+            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
             if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
                 eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
                         matcher.getReopeningPrice(), matcher.maxTradableQuantity));
