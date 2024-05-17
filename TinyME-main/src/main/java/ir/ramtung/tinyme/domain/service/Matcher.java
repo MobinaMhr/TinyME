@@ -119,6 +119,10 @@ public class Matcher {
                 checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.SELL));
         if(maxQuantityWithLastPrice == this.maxTradableQuantity)
             this.reopeningPrice = lastTradePrice;
+
+        if(maxTradableQuantity == 0){
+            this.reopeningPrice = 0;
+        }
     }
 
     public void removeOrdersWithZeroQuantity(Order order, Side side, OrderBook orderBook) {

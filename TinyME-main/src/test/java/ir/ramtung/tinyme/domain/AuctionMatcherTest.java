@@ -615,6 +615,7 @@ public class AuctionMatcherTest {
                 shareholder.getShareholderId(), 0);
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 0, 0));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 300 * 15700);
 
 
