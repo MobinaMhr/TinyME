@@ -1,5 +1,10 @@
 package ir.ramtung.tinyme.domain.entity;
 
+import ir.ramtung.tinyme.messaging.TradeDTO;
+import ir.ramtung.tinyme.messaging.event.Event;
+import ir.ramtung.tinyme.messaging.event.OrderActivateEvent;
+import ir.ramtung.tinyme.messaging.event.OrderExecutedEvent;
+import ir.ramtung.tinyme.messaging.event.OrderRejectedEvent;
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
@@ -9,8 +14,10 @@ import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Getter
 @Builder
@@ -60,7 +67,6 @@ public class Security {
         }
         return result;
     }
-
     public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null) {
@@ -82,7 +88,6 @@ public class Security {
             matcher.calculateReopeningPrice(orderBook);
         }
     }
-
     private Order findOrder(EnterOrderRq updateOrderRq) throws InvalidRequestException {
         Order order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         if (currentMatchingState == MatchingState.AUCTION && order != null) {
@@ -191,19 +196,6 @@ public class Security {
         activatedOrder = getInactiveOrderBook().getActivateCandidateOrders(lastTradePrice);
         return activatedOrder;
     }
-    public MatchResult checkForSLOActivation(MatchingState newMatchingState, Matcher matcher, LinkedList<Trade> trades) {
-        MatchResult matchResult = null;
-        Order activatedOrder = null;
-        while ((activatedOrder = getActivateCandidateOrder(matcher.getLastTradePrice())) != null) {
-            if (newMatchingState == MatchingState.AUCTION) {
-                matchResult = matcher.auctionExecute(activatedOrder);
-            } else {
-                matchResult = matcher.execute(activatedOrder);
-            }
-            trades.addAll(matchResult.trades());
-        }
-        return MatchResult.executed(trades);
-    }
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
         MatchResult matchResult = null;
         if (this.currentMatchingState == MatchingState.AUCTION) {
@@ -214,8 +206,6 @@ public class Security {
                 return MatchResult.executed();
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
-
-            matchResult = checkForSLOActivation(newMatchingState, matcher, trades);
         }
         this.currentMatchingState = newMatchingState;
         return matchResult;

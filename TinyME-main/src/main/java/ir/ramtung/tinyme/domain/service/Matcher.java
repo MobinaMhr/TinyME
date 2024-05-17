@@ -13,7 +13,6 @@ import java.util.*;
 public class Matcher {
     @Setter
     private int lastTradePrice;
-    //Default values
     public int reopeningPrice = 0;
     public int maxTradableQuantity = 0;
 
@@ -195,7 +194,6 @@ public class Matcher {
     private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){
         return (initialQuantity - remainder.getQuantity()) >= remainder.getMinimumExecutionQuantity();
     }
-
     public MatchResult execute(Order order) {
         int prevQuantity = order.getQuantity();
         MatchResult result = match(order);
