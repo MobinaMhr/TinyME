@@ -101,7 +101,6 @@ public class OrderHandler {
             if(matchResult != null && resultPublisher(matchResult, enterOrderRq, isTypeStopLimitOrder, security))
                 return;
 
-            // TODO ;
             executeActivatedSLO(enterOrderRq, security);
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), ex.getReasons()));

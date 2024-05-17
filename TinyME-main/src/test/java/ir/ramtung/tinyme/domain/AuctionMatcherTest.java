@@ -201,10 +201,6 @@ public class AuctionMatcherTest {
         assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
     }
     @Test
-    void check_if_update_matching_state_from_auction_to_continuous_works_properly_and_does_not_cause_any_trade() {
-        // TODO
-    }
-    @Test
     void check_if_update_matching_state_to_auction_activates_stop_limit_orders() {
         change_matching_state_to(MatchingState.AUCTION);
 
@@ -513,7 +509,7 @@ public class AuctionMatcherTest {
         assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
         assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
     }
-    ///////////////////////////////////////////////////// reopening price
+    ///////////////////////////////////////////////////// opening price
     private void change_last_trade_price(int price){
         orderBook.enqueue(new Order(2, security, Side.BUY, 100, price, broker1, shareholder));
 
@@ -568,6 +564,18 @@ public class AuctionMatcherTest {
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq2));
 
         verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15830, 200));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_when_order_book_is_empty () {
+        orderBook.removeByOrderId(Side.BUY,1);
+        orderBook.removeByOrderId(Side.SELL,7);
+        change_matching_state_to(MatchingState.AUCTION);
+
+        DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.SELL, 8);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleDeleteOrder(deleteOrderRq));
+
+        verify(eventPublisher).publish(new OrderDeletedEvent(4,8));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 0, 0));
     }
     @Test
     void check_if_reopening_price_is_calculated_properly_after_entering_new_order_in_auction_state() {
