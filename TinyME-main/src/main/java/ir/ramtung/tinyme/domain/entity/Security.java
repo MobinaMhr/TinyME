@@ -61,8 +61,7 @@ public class Security {
         return result;
     }
 
-    public MatchResult deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
-        System.out.println("Step :: 1");
+    public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null) {
             order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
@@ -70,26 +69,18 @@ public class Security {
         else if(currentMatchingState == MatchingState.AUCTION){
             throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
-        System.out.println("Step :: 2");
-        if (order == null)
+        if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
-        System.out.println("Step :: 3");
+        }
         if (order.getSide() == Side.BUY) {
-            System.out.println("Step :: 3 :: 1");
             order.getBroker().increaseCreditBy(order.getValue());
         }
-        System.out.println("Step :: 4");
+
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        System.out.println("Step :: 5");
         if (currentMatchingState == MatchingState.AUCTION) {
-            System.out.println("Step :: 5 :: 1");
             matcher.calculateReopeningPrice(orderBook);
-            System.out.println("Step :: 5 :: 1");
-            return MatchResult.executed(MatchingOutcome.EXECUTED_IN_AUCTION);
         }
-        System.out.println("Step :: 6");
-        return MatchResult.executed(MatchingOutcome.EXECUTED);
     }
 
     private Order findOrder(EnterOrderRq updateOrderRq) throws InvalidRequestException {
@@ -212,10 +203,8 @@ public class Security {
                 if (activatedOrder == null)
                     break;
                 if (newMatchingState == MatchingState.AUCTION) {
-                    // other results?
                     matchResult = matcher.auctionExecute(activatedOrder);
                 } else {
-                    // other results?
                     matchResult = matcher.execute(activatedOrder);
                 }
                 trades.addAll(matchResult.trades());

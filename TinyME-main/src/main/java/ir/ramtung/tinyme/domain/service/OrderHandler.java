@@ -40,7 +40,7 @@ public class OrderHandler {
             eventPublisher.publish(new OrderActivateEvent(enterOrderRq.getRequestId(), matchResult.remainder().getOrderId()));
         }
         if (matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
-            eventPublisher.publish(new ReopeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity));
+            eventPublisher.publish(new OpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity));
         }
         if (matchResult.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) {
             eventPublisher.publish(new OrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT)));
@@ -89,7 +89,7 @@ public class OrderHandler {
                 matchResult = security.newOrder(enterOrderRq, broker, shareholder, matcher);
                 isTypeStopLimitOrder = enterOrderRq.getStopPrice() > 0;
             }
-            else{ // UPDATE_ORDER
+            else{
                 isTypeStopLimitOrder = security.getInactiveOrderBook()
                         .findByOrderId(enterOrderRq.getSide(),enterOrderRq.getOrderId()) != null;
                 matchResult = security.updateOrder(enterOrderRq, matcher);
@@ -150,16 +150,17 @@ public class OrderHandler {
         try {
             validateDeleteOrderRq(deleteOrderRq);
             Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
-            MatchResult result = security.deleteOrder(deleteOrderRq, matcher);
+            security.deleteOrder(deleteOrderRq, matcher);
             eventPublisher.publish(new OrderDeletedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId()));
-            if (result.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION) {
-                eventPublisher.publish(new ReopeningPriceEvent(security.getIsin(),
+            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
+                eventPublisher.publish(new OpeningPriceEvent(security.getIsin(),
                         matcher.getReopeningPrice(), matcher.maxTradableQuantity));
             }
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new OrderRejectedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId(), ex.getReasons()));
         }
     }
+
     private void validateEnterOrderRq(EnterOrderRq enterOrderRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
         if (enterOrderRq.getOrderId() <= 0)

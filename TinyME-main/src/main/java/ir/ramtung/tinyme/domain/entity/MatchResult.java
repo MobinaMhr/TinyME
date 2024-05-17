@@ -45,12 +45,6 @@ public final class MatchResult {
     public static MatchResult executed() {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
     }
-    public static MatchResult executed(MatchingOutcome outcome) {
-        return (outcome == MatchingOutcome.EXECUTED_IN_AUCTION)
-                ? new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>())
-                : new MatchResult(MatchingOutcome.EXECUTED, null, new LinkedList<>());
-//        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
-    }
 
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
