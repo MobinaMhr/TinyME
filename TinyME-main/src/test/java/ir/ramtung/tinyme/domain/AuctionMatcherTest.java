@@ -43,9 +43,11 @@ public class AuctionMatcherTest {
     BrokerRepository brokerRepository;
     @Autowired
     ShareholderRepository shareholderRepository;
-    private static final int MAIN_BROKER_CREDIT = 100_000_000;
+    private static final int BROKER_1_CREDIT = 100_000_000;
+    private static final int BROKER_2_CREDIT = 20_000_000;
     private Security security;
-    private Broker broker;
+    private Broker broker1;
+    private Broker broker2;
     private Shareholder shareholder;
     private OrderBook orderBook;
     private InactiveOrderBook inactiveOrderBook;
@@ -61,433 +63,132 @@ public class AuctionMatcherTest {
 
         security = Security.builder().isin("ABC").build();
 
-        broker = Broker.builder().credit(MAIN_BROKER_CREDIT).brokerId(1).build();
-        brokerRepository.addBroker(broker);
+        broker1 = Broker.builder().credit(BROKER_1_CREDIT).brokerId(1).build();
+        brokerRepository.addBroker(broker1);
+        broker2 = Broker.builder().credit(BROKER_2_CREDIT).brokerId(2).build();
+        brokerRepository.addBroker(broker2);
+
         shareholder = Shareholder.builder().build();
         shareholderRepository.addShareholder(shareholder);
         shareholder.incPosition(security, 100_000);
+
         orderBook = security.getOrderBook();
+
         inactiveOrderBook = security.getInactiveOrderBook();
+
         securityRepository.addSecurity(security);
 
         orders = Arrays.asList(
-                new Order(1, security, Side.BUY, 304, 15700, broker, shareholder),
+                new Order(1, security, Side.BUY, 304, 15700, broker1, shareholder),
 
-                new Order(6, security, Side.SELL, 100, 15800, broker, shareholder),
+                new Order(6, security, Side.SELL, 100, 15800, broker1, shareholder),
 
-                new Order(7, security, Side.SELL, 100, 15810, broker, shareholder),
-                new Order(8, security, Side.SELL, 100, 15820, broker, shareholder)
+                new Order(7, security, Side.SELL, 100, 15810, broker1, shareholder),
+                new Order(8, security, Side.SELL, 100, 15820, broker1, shareholder)
         );
         orders.forEach(order -> orderBook.enqueue(order));
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15900, broker.getBrokerId(),
+                LocalDateTime.now(), Side.BUY, 100, 15900, broker1.getBrokerId(),
                 shareholder.getShareholderId(), 0);
-        security.newOrder(enterOrderRq, broker, shareholder, matcher);
+        security.newOrder(enterOrderRq, broker1, shareholder, matcher);
     }
-
-    @Test
-    void check_if_MEQ_order_is_not_allowed_in_auction() {
+    private void change_matching_state_to(MatchingState new_matching_state) {
         ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 250);
-
-        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
-
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(result.trades()).isEmpty();
-        assertThat(result.outcome()).isEqualTo(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION);
+                security.getIsin(), new_matching_state);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleChangeMatchingStateRq(changeStateRq));
     }
-
+    ///////////////////////////////////////////////////// update matching state
     @Test
-    void check_if_stop_limit_order_order_is_not_allowed_in_auction() {
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
+        change_matching_state_to(MatchingState.CONTINUOUS);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
+        change_matching_state_to(MatchingState.CONTINUOUS);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 15800);
-
-        MatchResult result = security.newOrder(enterOrderRq, testBroker, shareholder, matcher);
-        verify(eventPublisher,times(0)).publish(any(OrderAcceptedEvent.class));
-
-
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(result.trades()).isEmpty();
-        assertThat(result.outcome()).isEqualTo(MatchingOutcome.STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION);
-    }
-
-    @Test
-    void check_if_calc_reopening_price_works_properly() {
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
-
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        orderHandler.handleEnterOrder(enterOrderRq);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
-
-        ChangeMatchingStateRq changeStateRq2 = ChangeMatchingStateRq.createNewChangeMatchingStateRq(security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq2);
         verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
-
-        assertThat(matcher.getLastTradePrice()).isEqualTo(matcher.getReopeningPrice());
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
     }
     @Test
-    void check_if_reopening_price_changes_after_delete(){
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
+    void check_if_update_matching_state_from_auction_to_continues_works_properly_when_not_causes_trades() {
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
+        change_matching_state_to(MatchingState.CONTINUOUS);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        orderHandler.handleEnterOrder(enterOrderRq);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
-
-        DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.SELL, 7);
-        orderHandler.handleDeleteOrder(deleteOrderRq);
-
-        verify(eventPublisher).publish(new OrderDeletedEvent(4,7));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 100));
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
     }
     @Test
-    void check_if_reopening_price_changes_after_update(){
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
+    void check_if_update_matching_state_from_continuous_to_auction_works_properly() {
+        change_matching_state_to(MatchingState.CONTINUOUS);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        verify(eventPublisher).publish(new SecurityStateChangedEvent(security.getIsin(), MatchingState.AUCTION));
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        orderHandler.handleEnterOrder(enterOrderRq);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
-
-        EnterOrderRq enterOrderRq1 = EnterOrderRq.createUpdateOrderRq(4, security.getIsin(), 7,
-                LocalDateTime.now(), Side.SELL, 100, 15900, broker.getBrokerId(), shareholder.getShareholderId(),  0);
-        orderHandler.handleEnterOrder(enterOrderRq1);
-
-        verify(eventPublisher).publish(new OrderUpdatedEvent(4,7));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 100));
+        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
     }
-
-    @Test
-    void check_if_update_state_to_auction_activates_stop_limit_orders() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
-
-        List<Order> inactiveOrders = List.of(
-                new StopLimitOrder(3, security, Side.BUY, 304, 15900, broker, shareholder, 15700)
-        );
-        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
-    }
-
-    @Test
-    void check_if_update_state_to_auction_activates_stop_limit_orders_and_they_trade() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15830));
-
-        List<Order> inactiveOrders = List.of(
-                new StopLimitOrder(3, security, Side.BUY, 304, 15900, broker, shareholder, 15700)
-        );
-        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810 + 100 * 15900);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (100 * 15810));
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
-        assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
-        assertThat(orderBook.findByOrderId(Side.BUY,3).getQuantity()).isEqualTo(204);
-
-    }
-
-    @Test
-    void check_if_updating_MEQ_amount_in_MEQ_order_is_not_allowed_in_auction_state() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
-                3, LocalDateTime.now(), Side.BUY, 350, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 150);
-
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-
-        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
-                3, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 250);
-
-        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-    }
-    @Test
-    void check_if_updating_quantity_in_MEQ_order_is_allowed_in_auction_state() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
-                3, LocalDateTime.now(), Side.BUY, 350, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 150);
-
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
-
-        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
-                3, LocalDateTime.now(), Side.BUY, 302, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 150);
-
-        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-//
-//        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-    }
-
-    @Test // TODO
-    void check_if_updating_inactive_stop_limit_order_is_not_allowed_in_auction_state() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
-                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 15850);
-
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(),
-                2, LocalDateTime.now(), Side.BUY, 200, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 250);
-
-        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-    }
-
-    @Test
-    void check_if_updating_active_stop_limit_order_is_allowed_in_auction_state() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
-                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0, 11250);
-
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(),
-                2, LocalDateTime.now(), Side.BUY, 300, 15900, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 250);
-
-        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
-    }
-
     @Test
     void check_if_update_matching_state_from_auction_to_auction_works_properly_when_causes_trades() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 500, 15830, testBroker.getBrokerId(),
+                LocalDateTime.now(), Side.BUY, 500, 15830, broker2.getBrokerId(),
                 shareholder.getShareholderId(), 0);
-
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
 
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        verify(eventPublisher,times(2)).publish(any(TradeEvent.class));
         verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+        verify(eventPublisher,times(2)).publish(any(TradeEvent.class));
+
         assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
         assertThat(orderBook.findByOrderId(Side.BUY,2).getQuantity()).isEqualTo(300);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 200 * 15820 - 300 * 15830);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 200 * 15820);
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 200 * 15820 - 300 * 15830);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 200 * 15820);
+
         assertThat(orderBook.findByOrderId(Side.BUY,7)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
     }
-
     @Test
     void check_if_update_matching_state_from_auction_to_auction_works_properly_when_not_causes_trades() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
+
         verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
-
     }
-
     @Test
-    void check_if_update_matching_state_from_auction_to_continuous_works_properly() {
-
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
+    void check_if_update_matching_state_from_auction_to_continuous_works_properly_and_causes_trade() {
+        change_matching_state_to(MatchingState.AUCTION);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
                 shareholder.getShareholderId(), 0);
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
         verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
         assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        change_matching_state_to(MatchingState.CONTINUOUS);
+        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
 
         verify(eventPublisher,times(1)).publish(any(TradeEvent.class));
         verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
         assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15810);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15810);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 100 * 15810);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15810);
         assertThat(orderBook.findByOrderId(Side.BUY,7)).isNull();
 
         EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRqWithStopPrice(4, security.getIsin(), 4,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
                 shareholder.getShareholderId(), 0, 15810);
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
 
@@ -495,139 +196,499 @@ public class AuctionMatcherTest {
         verify(eventPublisher,times(1)).publish(any(OrderExecutedEvent.class));
         assertThat(orderBook.findByOrderId(Side.BUY,4)).isNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY,4)).isNull();
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15820 - 100 * 15810);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 100 * 15820 + 100 * 15810);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 100 * 15820 - 100 * 15810);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15820 + 100 * 15810);
         assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
-
     }
-
     @Test
-    void check_if_update_matching_state_from_auction_to_continues_works_properly_when_not_causes_trades() {
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
-
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+    void check_if_update_matching_state_from_auction_to_continuous_works_properly_and_does_not_cause_any_trade() {
+        // TODO
     }
-
     @Test
-    void check_if_update_matching_state_from_continuous_to_continuous_works_properly() {
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+    void check_if_update_matching_state_to_auction_activates_stop_limit_orders() {
+        change_matching_state_to(MatchingState.AUCTION);
 
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
-        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
+                15900, broker1, shareholder, 15700));
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
 
+        change_matching_state_to(MatchingState.AUCTION);
 
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
     }
-
     @Test
-    void check_if_update_matching_state_from_continuous_to_auction_works_properly() {
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.CONTINUOUS);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.CONTINUOUS);
+    void check_if_update_matching_state_to_auction_causes_trade_with_activated_stop_limit_order() {
+        change_matching_state_to(MatchingState.AUCTION);
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-        assertThat(security.getCurrentMatchingState()).isEqualTo(MatchingState.AUCTION);
-        verify(eventPublisher,times(2)).publish(any(SecurityStateChangedEvent.class));
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
+                15900, broker1, shareholder, 15700));
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        verify(eventPublisher,times(1)).publish(any(TradeEvent.class));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15810);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810));
+
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
     }
+    @Test
+    void check_if_update_matching_state_to_continuous_activates_stop_limit_orders() {
+        change_matching_state_to(MatchingState.AUCTION);
 
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
+                15900, broker1, shareholder, 15700));
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+
+        change_matching_state_to(MatchingState.CONTINUOUS);
+
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
+    }
+    @Test
+    void check_if_update_matching_state_to_continuous_causes_trade_with_activated_stop_limit_order() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
+                15900, broker1, shareholder, 15700));
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+
+        change_matching_state_to(MatchingState.CONTINUOUS);
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15810 + 100 * 15900);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810));
+
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+        assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
+        assertThat(orderBook.findByOrderId(Side.BUY,8)).isNull();
+        assertThat(orderBook.findByOrderId(Side.BUY,3).getQuantity()).isEqualTo(204);
+    }
+    ///////////////////////////////////////////////////// new order
+    @Test
+    void check_if_new_buy_iceberg_order_is_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 100, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 10);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher,times(1)).publish(any(OrderAcceptedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15900));
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+    }
+    @Test
+    void check_if_new_sell_iceberg_order_is_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.SELL, 100, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 10);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher,times(1)).publish(any(OrderAcceptedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.SELL,2)).isNotNull();
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+    }
+    @Test
+    void check_if_new_buy_order_without_enough_credit_in_broker_is_rejected_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100000, 2000, broker1.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher,times(0)).publish(any(OrderAcceptedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+//        verify(eventPublisher, times(1)).publish(any(notEnoughCredit.class));
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+    }
+    @Test
+    void check_if_new_buy_order_with_enough_credit_in_broker_is_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 10, 2000, broker1.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher, times(1)).publish(any(OrderAcceptedEvent.class));
+        verify(eventPublisher, times(0)).publish(any(TradeEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+    }
+    @Test
+    void check_if_new_sell_order_is_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.SELL, 10, 2000, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher, times(1)).publish(any(OrderAcceptedEvent.class));
+        verify(eventPublisher, times(0)).publish(any(TradeEvent.class));
+        assertThat(orderBook.findByOrderId(Side.SELL,2)).isNotNull();
+    }
+    @Test
+    void check_if_new_buy_order_decreases_broker_credit_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 10, 2000, broker1.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT - (10 * 2000));
+    }
+    @Test
+    void check_if_new_sell_order_does_not_decreases_broker_credit_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.SELL, 10, 2000, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+    }
+    @Test
+    void check_if_new_MEQ_order_is_not_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+        MatchResult result = security.newOrder(enterOrderRq, broker2, shareholder, matcher);
+
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(result.trades()).isEmpty();
+        assertThat(result.outcome()).isEqualTo(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION);
+    }
+    @Test
+    void check_if_new_stop_limit_order_order_is_not_allowed_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 100, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15800);
+
+        MatchResult result = security.newOrder(enterOrderRq, broker2, shareholder, matcher);
+        verify(eventPublisher,times(0)).publish(any(OrderAcceptedEvent.class));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(result.trades()).isEmpty();
+        assertThat(result.outcome()).isEqualTo(MatchingOutcome.STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION);
+    }
+    ///////////////////////////////////////////////////// update order
+    @Test
+    void check_if_updating_MEQ_amount_in_MEQ_order_is_not_allowed_in_auction_state() {
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 350, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 150);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 302, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 250);
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+    }
+    @Test
+    void check_if_updating_quantity_in_MEQ_order_is_allowed_in_auction_state() {
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithMEQ(3, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 350, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 150);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithMEQ(4, security.getIsin(),
+                3, LocalDateTime.now(), Side.BUY, 302, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 150);
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
+    }
+    @Test
+    void check_if_updating_inactive_stop_limit_order_is_not_allowed_in_auction_state() {
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 15850);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 200, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 250);
+        assertThatException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNull();
+    }
+    @Test
+    void check_if_updating_active_stop_limit_order_is_allowed_in_auction_state() {
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRqWithStopPrice(3, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0, 11250);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRqWithStopPrice(4, security.getIsin(),
+                2, LocalDateTime.now(), Side.BUY, 300, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 250);
+        assertThatNoException().isThrownBy(() -> security.updateOrder(updateOrderRq, matcher));
+        assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
+    }
+    ///////////////////////////////////////////////////// delete order
+    @Test
+    void check_if_delete_order_works_properly_in_auction_state(){
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.SELL, 7);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleDeleteOrder(deleteOrderRq));
+        verify(eventPublisher).publish(new OrderDeletedEvent(4,7));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
+    }
+    ///////////////////////////////////////////////////// reopening price
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_entering_new_order() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 500, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_updating_order() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(),
+                4, LocalDateTime.now(), Side.BUY, 300, 15700, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 0, 0));
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 300 * 15700);
+
+        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRq(5, security.getIsin(),
+                4, LocalDateTime.now(), Side.BUY, 300, 15900, broker1.getBrokerId(),
+                shareholder.getShareholderId(),0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(updateOrderRq));
+
+        verify(eventPublisher).publish(new OrderUpdatedEvent(5, 4));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 300 * 15900);
+        assertThat(orderBook.findByOrderId(Side.BUY,4)).isNotNull();
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_deleting_order() {
+        //TODO
+    }
+    @Test
+    void check_if_credits_change_properly_after_reopening() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
+                15900, broker1, shareholder, 15700));
+        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+
+        change_matching_state_to(MatchingState.CONTINUOUS);
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + (100 * 15810) + (100 * 15900));
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_in_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_transferring_to_auction_state() {
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+
+        change_matching_state_to(MatchingState.AUCTION);
+
+        assertThat(matcher.getLastTradePrice()).isEqualTo(matcher.getReopeningPrice());
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15810);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_delete_order(){
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        DeleteOrderRq deleteOrderRq = new DeleteOrderRq(4, security.getIsin(), Side.SELL, 7);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleDeleteOrder(deleteOrderRq));
+        verify(eventPublisher).publish(new OrderDeletedEvent(4,7));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 100));
+    }
+    @Test
+    void check_if_reopening_price_is_calculated_properly_after_update_order(){
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
+
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
+
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createUpdateOrderRq(4, security.getIsin(), 7,
+                LocalDateTime.now(), Side.SELL, 100, 15900, broker1.getBrokerId(), shareholder.getShareholderId(),  0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
+        verify(eventPublisher).publish(new OrderUpdatedEvent(4,7));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 100));
+    }
+    ///////////////////////////////////////////////////// iceberg order
     @Test
     void check_if_iceberg_order_loses_priority_in_auction_match() {
-
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        change_matching_state_to(MatchingState.AUCTION);
 
         security.getOrderBook().removeByOrderId(Side.BUY,1);
         security.getOrderBook().removeByOrderId(Side.SELL,8);
 
-
-
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
-                LocalDateTime.now(), Side.BUY, 100, 15830, testBroker.getBrokerId(),
+                LocalDateTime.now(), Side.BUY, 100, 15830, broker2.getBrokerId(),
                 shareholder.getShareholderId(), 0);
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
         verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15810, 100));
         assertThat(orderBook.findByOrderId(Side.BUY,2)).isNotNull();
 
+        change_matching_state_to(MatchingState.AUCTION);
 
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
+        orderBook.enqueue(new IcebergOrder(2, security, Side.SELL, 90, 15700,
+                broker1, shareholder,50));
+        orderBook.enqueue(new IcebergOrder(3, security, Side.SELL, 100, 15700,
+                broker1, shareholder,40));
+        orderBook.enqueue(new Order(1, security, Side.BUY, 80, 15900, broker2, shareholder));
 
-        orderBook.enqueue(new IcebergOrder(2, security, Side.SELL, 90, 15700, broker, shareholder,50));
-        orderBook.enqueue(new IcebergOrder(3, security, Side.SELL, 100, 15700, broker, shareholder,40));
-        orderBook.enqueue(new Order(1, security, Side.BUY, 80, 15900, testBroker, shareholder));
-
-
-        changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
+        change_matching_state_to(MatchingState.AUCTION);
 
         verify(eventPublisher,times(3)).publish(any(SecurityStateChangedEvent.class));
         verify(eventPublisher,times(3)).publish(any(TradeEvent.class));
+
         assertThat(orderBook.findByOrderId(Side.BUY,1)).isNull();
         assertThat(orderBook.findByOrderId(Side.SELL,2)).isNotNull();
         assertThat(orderBook.findByOrderId(Side.SELL,3)).isNotNull();
         assertThat(orderBook.findByOrderId(Side.SELL,2).getQuantity()).isEqualTo(40);
         assertThat(orderBook.findByOrderId(Side.SELL,3).getQuantity()).isEqualTo(10);
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 100 * 15810);
-        assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + 80 * 15900 + 100 * 15810);
+
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - 100 * 15810);
+        assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 80 * 15900 + 100 * 15810);
     }
-    @Test
-    void check_if_reopening_price_is_calculated_properly_after_updating_order() {
-
-        int testBrokerCredit = 20_000_000;
-        Broker testBroker = Broker.builder().credit(testBrokerCredit).build();
-        brokerRepository.addBroker(testBroker);
-
-        ChangeMatchingStateRq changeStateRq = ChangeMatchingStateRq.createNewChangeMatchingStateRq(
-                security.getIsin(), MatchingState.AUCTION);
-        orderHandler.handleChangeMatchingStateRq(changeStateRq);
-
-        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 4,
-                LocalDateTime.now(), Side.BUY, 300, 15700, testBroker.getBrokerId(),
-                shareholder.getShareholderId(), 0);
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
-
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 0, 0));
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 300 * 15700);
-
-
-        EnterOrderRq updateOrderRq = EnterOrderRq.createUpdateOrderRq(5, security.getIsin(), 4,
-                LocalDateTime.now(), Side.BUY, 300, 15900, broker.getBrokerId(),
-                shareholder.getShareholderId(),0);
-        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(updateOrderRq));
-        verify(eventPublisher,times(1)).publish(any(SecurityStateChangedEvent.class));
-        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15820, 200));
-        verify(eventPublisher).publish(new OrderUpdatedEvent(5, 4));
-        assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - 300 * 15900);
-        assertThat(orderBook.findByOrderId(Side.BUY,4)).isNotNull();
-
-    }
+    /////////////////////////////////////////////////////
 }
