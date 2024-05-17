@@ -514,6 +514,61 @@ public class AuctionMatcherTest {
         assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT);
     }
     ///////////////////////////////////////////////////// reopening price
+    private void change_last_trade_price(int price){
+        orderBook.enqueue(new Order(2, security, Side.BUY, 100, price, broker1, shareholder));
+
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.SELL, 100, price, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_when_two_orders_have_the_same_tradable_quantity_but_different_distance_from_last_trade_price() {
+        change_last_trade_price(15835);
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 200, 15840, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
+
+
+        EnterOrderRq enterOrderRq2 = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 200, 15850, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq2));
+
+        verify(eventPublisher,times(2)).publish(
+                (new OpeningPriceEvent(security.getIsin(), 15840, 200)));
+
+        EnterOrderRq enterOrderRq3 = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 200, 15836, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq3));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15836, 200));
+    }
+
+    @Test
+    void check_if_reopening_price_is_calculated_properly_when_two_orders_have_the_same_tradable_quantity_and_distance_from_last_trade_price() {
+        change_last_trade_price(15835);
+        change_matching_state_to(MatchingState.AUCTION);
+
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 200, 15840, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15840, 200));
+
+        EnterOrderRq enterOrderRq2 = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 200, 15830, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq2));
+
+        verify(eventPublisher).publish(new OpeningPriceEvent(security.getIsin(), 15830, 200));
+    }
     @Test
     void check_if_reopening_price_is_calculated_properly_after_entering_new_order_in_auction_state() {
         change_matching_state_to(MatchingState.AUCTION);
