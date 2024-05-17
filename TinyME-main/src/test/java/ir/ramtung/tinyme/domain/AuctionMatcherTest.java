@@ -215,11 +215,17 @@ public class AuctionMatcherTest {
 
         change_matching_state_to(MatchingState.AUCTION);
 
+
+
         assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
     }
     @Test
     void check_if_update_matching_state_to_auction_causes_trade_with_activated_stop_limit_order() {
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRqWithStopPrice(5, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 304, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0,15810);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
         change_matching_state_to(MatchingState.AUCTION);
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
@@ -228,24 +234,27 @@ public class AuctionMatcherTest {
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
         assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT);
-        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830));
-
-        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
-                15900, broker1, shareholder, 15700));
-        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15830) - (304 * 15900));
 
         change_matching_state_to(MatchingState.AUCTION);
+        verify(eventPublisher).publish(new OrderActivateEvent(5,3));
+
 
         verify(eventPublisher,times(1)).publish(any(TradeEvent.class));
 
         assertThat(broker1.getCredit()).isEqualTo(BROKER_1_CREDIT + 100 * 15810);
-        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810));
+        assertThat(broker2.getCredit()).isEqualTo(BROKER_2_CREDIT - (100 * 15810) - (304 * 15900));
 
         assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();
     }
     @Test
     void check_if_update_matching_state_to_continuous_activates_stop_limit_orders() {
+        EnterOrderRq enterOrderRq1 = EnterOrderRq.createNewOrderRqWithStopPrice(5, security.getIsin(), 3,
+                LocalDateTime.now(), Side.BUY, 304, 15900, broker2.getBrokerId(),
+                shareholder.getShareholderId(), 0,15810);
+        assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq1));
+
         change_matching_state_to(MatchingState.AUCTION);
 
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(3, security.getIsin(), 2,
@@ -253,11 +262,9 @@ public class AuctionMatcherTest {
                 shareholder.getShareholderId(), 0);
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(enterOrderRq));
 
-        List<Order> inactiveOrders = List.of(new StopLimitOrder(3, security, Side.BUY, 304,
-                15900, broker1, shareholder, 15700));
-        inactiveOrders.forEach(order -> inactiveOrderBook.enqueue(order));
-
         change_matching_state_to(MatchingState.CONTINUOUS);
+        verify(eventPublisher).publish(new OrderActivateEvent(5,3));
+        verify(eventPublisher,times(1)).publish(any(OrderExecutedEvent.class));
 
         assertThat(orderBook.findByOrderId(Side.BUY,3)).isNotNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY,3)).isNull();

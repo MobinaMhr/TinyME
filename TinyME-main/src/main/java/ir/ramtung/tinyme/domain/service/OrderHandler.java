@@ -26,7 +26,7 @@ public class OrderHandler {
     ShareholderRepository shareholderRepository;
     EventPublisher eventPublisher;
     Matcher matcher;
-    public HashMap<Long, Long> orderIdRqIdMap;
+    private  HashMap<Long, Long> orderIdRqIdMap;
 
     public OrderHandler(SecurityRepository securityRepository, BrokerRepository brokerRepository,
                         ShareholderRepository shareholderRepository, EventPublisher eventPublisher, Matcher matcher) {
