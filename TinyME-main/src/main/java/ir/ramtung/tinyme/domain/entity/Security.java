@@ -186,6 +186,24 @@ public class Security {
         return matchResult;
     }
 
+    public Order getActivateCandidateOrder(int lastTradePrice) {
+        Order activatedOrder = null;
+        activatedOrder = getInactiveOrderBook().getActivateCandidateOrders(lastTradePrice);
+        return activatedOrder;
+    }
+    public MatchResult checkForSLOActivation(MatchingState newMatchingState, Matcher matcher, LinkedList<Trade> trades) {
+        MatchResult matchResult = null;
+        Order activatedOrder = null;
+        while ((activatedOrder = getActivateCandidateOrder(matcher.getLastTradePrice())) != null) {
+            if (newMatchingState == MatchingState.AUCTION) {
+                matchResult = matcher.auctionExecute(activatedOrder);
+            } else {
+                matchResult = matcher.execute(activatedOrder);
+            }
+            trades.addAll(matchResult.trades());
+        }
+        return MatchResult.executed(trades);
+    }
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
         MatchResult matchResult = null;
         if (this.currentMatchingState == MatchingState.AUCTION) {
@@ -197,19 +215,7 @@ public class Security {
             }
             matcher.setLastTradePrice(matcher.reopeningPrice);
 
-            Order activatedOrder = null;
-            while (true) {
-                activatedOrder = inactiveOrderBook.getActivateCandidateOrders(matcher.getLastTradePrice());
-                if (activatedOrder == null)
-                    break;
-                if (newMatchingState == MatchingState.AUCTION) {
-                    matchResult = matcher.auctionExecute(activatedOrder);
-                } else {
-                    matchResult = matcher.execute(activatedOrder);
-                }
-                trades.addAll(matchResult.trades());
-            }
-            matchResult = MatchResult.executed(trades);
+            matchResult = checkForSLOActivation(newMatchingState, matcher, trades);
         }
         this.currentMatchingState = newMatchingState;
         return matchResult;
