@@ -116,6 +116,7 @@ public class OrderHandler {
             validateChangeMatchingStateRq(changeMatchingStateRq);
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
+            MatchingState oldMatchingState = security.getCurrentMatchingState();
             MatchResult result = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
             eventPublisher.publish(new SecurityStateChangedEvent(changeMatchingStateRq.getSecurityIsin(),
                     changeMatchingStateRq.getTargetState()));
@@ -126,7 +127,7 @@ public class OrderHandler {
                 eventPublisher.publish(new TradeEvent(security.getIsin(), trade.getPrice(), trade.getQuantity(),
                         trade.getBuy().getOrderId(), trade.getSell().getOrderId()));
             }
-            if(security.getCurrentMatchingState() == MatchingState.AUCTION)
+            if(oldMatchingState == MatchingState.AUCTION)
                 executeActivatedSLO(security, changeMatchingStateRq);
         } catch (InvalidRequestException ex) {
             eventPublisher.publish(new ChangeMatchingStateRqRejectedEvent(

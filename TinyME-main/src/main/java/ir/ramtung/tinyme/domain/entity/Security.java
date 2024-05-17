@@ -49,6 +49,7 @@ public class Security {
                     enterOrderRq.getQuantity(), enterOrderRq.getPrice(), broker, shareholder,
                     enterOrderRq.getEntryTime(), OrderStatus.NEW, enterOrderRq.getStopPrice());
     }
+
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
         if (enterOrderRq.getSide() == Side.SELL &&
                 !shareholder.hasEnoughPositionsOn(this,
@@ -67,6 +68,7 @@ public class Security {
         }
         return result;
     }
+
     public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order == null) {
@@ -88,6 +90,7 @@ public class Security {
             matcher.calculateReopeningPrice(orderBook);
         }
     }
+
     private Order findOrder(EnterOrderRq updateOrderRq) throws InvalidRequestException {
         Order order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         if (currentMatchingState == MatchingState.AUCTION && order != null) {
@@ -213,6 +216,3 @@ public class Security {
         return matchResult;
     }
 }
-
-
-
