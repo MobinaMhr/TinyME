@@ -194,9 +194,9 @@ public class Security {
         return matchResult;
     }
 
-    public Order getActivateCandidateOrder(int lastTradePrice) {
+    public Order getActivateCandidateOrder(int lastTradePrice) { // TODO rename this or the InactiveOrderBook method
         Order activatedOrder = null;
-        activatedOrder = getInactiveOrderBook().getActivateCandidateOrders(lastTradePrice);
+        activatedOrder = getInactiveOrderBook().getActivationCandidateOrder(lastTradePrice);
         return activatedOrder;
     }
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {

@@ -22,8 +22,7 @@ public class InactiveOrderBook extends OrderBook{
     @Override
     public void enqueue(Order order) {
         if (order instanceof StopLimitOrder stopLimitOrder) {
-            List<StopLimitOrder> queue = getInactiveQueue(stopLimitOrder.getSide());
-            ListIterator<StopLimitOrder> it = queue.listIterator();
+            var it = getInactiveQueue(stopLimitOrder.getSide()).listIterator();
             while (it.hasNext()) {
                 if (stopLimitOrder.queuesBefore(it.next())) {
                     it.previous();
@@ -40,18 +39,17 @@ public class InactiveOrderBook extends OrderBook{
 
     @Override
     public Order findByOrderId(Side side, long orderId) {
-        var queue = getInactiveQueue(side);
-        for (Order order : queue) {
-            if (order.getOrderId() == orderId)
+        for (Order order : getInactiveQueue(side)) {
+            if (order.getOrderId() == orderId) {
                 return order;
+            }
         }
         return null;
     }
 
     @Override
     public boolean removeByOrderId(Side side, long orderId) {
-        LinkedList<StopLimitOrder> inactiveQueue = getInactiveQueue(side);
-        var inactiveIt = inactiveQueue.listIterator();
+        var inactiveIt = getInactiveQueue(side).listIterator();
         while (inactiveIt.hasNext()) {
             if (inactiveIt.next().getOrderId() == orderId) {
                 inactiveIt.remove();
@@ -60,25 +58,32 @@ public class InactiveOrderBook extends OrderBook{
         }
         return false;
     }
+    private StopLimitOrder findEligibleOrder(LinkedList<StopLimitOrder> orderQueue,
+                                             int price) {
+        if (orderQueue.isEmpty()) {
+            return null;
+        }
 
-    public StopLimitOrder getActivateCandidateOrders(int lastTradePrice){
-        if (!inactiveSellOrderQueue.isEmpty()) {
-            StopLimitOrder stopLimitOrder = inactiveSellOrderQueue.getFirst();
-            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
-                inactiveSellOrderQueue.removeFirst();
-                return stopLimitOrder;
-            }
+        StopLimitOrder stopLimitOrder = orderQueue.getFirst();
+        if (!stopLimitOrder.canMeetLastTradePrice(price)) {
             return null;
         }
-        if(!inactiveBuyOrderQueue.isEmpty()) {
-            StopLimitOrder stopLimitOrder = inactiveBuyOrderQueue.getFirst();
-            if (stopLimitOrder.canMeetLastTradePrice(lastTradePrice)) {
-                inactiveBuyOrderQueue.removeFirst();
-                stopLimitOrder.getBroker().increaseCreditBy(stopLimitOrder.getValue());
-                return stopLimitOrder;
-            }
-            return null;
+
+        orderQueue.removeFirst();
+        return stopLimitOrder;
+    }
+
+    public StopLimitOrder getActivationCandidateOrder(int lastTradePrice) {
+        StopLimitOrder stopLimitOrder;
+        stopLimitOrder= findEligibleOrder(inactiveSellOrderQueue, lastTradePrice);
+        if (stopLimitOrder != null) {
+            return stopLimitOrder;
         }
-        return null;
+
+        stopLimitOrder = findEligibleOrder(inactiveBuyOrderQueue, lastTradePrice);
+        if (stopLimitOrder != null) {
+            stopLimitOrder.getBroker().increaseCreditBy(stopLimitOrder.getValue());
+        }
+        return stopLimitOrder;
     }
 }
