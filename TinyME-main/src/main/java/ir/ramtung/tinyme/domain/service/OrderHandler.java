@@ -177,6 +177,7 @@ public class OrderHandler {
         }
     }
 
+    
     private void validateEnterOrderAttributes(EnterOrderRq enterOrderRq, List<String> errors) {
         if (enterOrderRq.getOrderId() <= 0)
             errors.add(Message.INVALID_ORDER_ID);
@@ -252,15 +253,21 @@ public class OrderHandler {
         }
     }
 
+    private void validateDeleteOrderAttributes(DeleteOrderRq deleteOrderRq, List<String> errors) {
+        if (deleteOrderRq.getOrderId() <= 0)
+            errors.add(Message.INVALID_ORDER_ID);
+    }
+    private void validateDeleteOrderRqSecurity(DeleteOrderRq deleteOrderRq, List<String> errors) {
+        Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
+        if (security == null)
+            errors.add(Message.UNKNOWN_SECURITY_ISIN);
+    }
     private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
 
-        if (deleteOrderRq.getOrderId() <= 0) {
-            errors.add(Message.INVALID_ORDER_ID);
-        }
-        if (securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin()) == null) {
-            errors.add(Message.UNKNOWN_SECURITY_ISIN);
-        }
+        validateDeleteOrderAttributes(deleteOrderRq, errors);
+        validateDeleteOrderRqSecurity(deleteOrderRq, errors);
+
         if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
         }
