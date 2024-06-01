@@ -232,21 +232,26 @@ public class OrderHandler {
         }
     }
 
-    private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) throws InvalidRequestException {
-        List<String> errors = new LinkedList<>();
+    private void validateChangeMatchingStateRqSecurity(ChangeMatchingStateRq changeMatchingStateRq,
+                                                       List<String> errors) {
         Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-
-        if (security == null) {
+        if (security == null)
             errors.add(Message.UNKNOWN_SECURITY_ISIN);
-        }
         if(changeMatchingStateRq.getTargetState() != MatchingState.AUCTION &&
-                changeMatchingStateRq.getTargetState() != MatchingState.CONTINUOUS){
+                changeMatchingStateRq.getTargetState() != MatchingState.CONTINUOUS)
             errors.add(Message.INVALID_TARGET_MATCHING_STATE);
-        }
+    }
+    private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq)
+            throws InvalidRequestException {
+        List<String> errors = new LinkedList<>();
+
+        validateChangeMatchingStateRqSecurity(changeMatchingStateRq, errors);
+
         if (!errors.isEmpty()) {
             throw new InvalidRequestException(errors);
         }
     }
+
     private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
         List<String> errors = new LinkedList<>();
 
