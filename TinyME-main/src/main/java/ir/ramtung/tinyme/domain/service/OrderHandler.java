@@ -35,7 +35,7 @@ public class OrderHandler {
         this.shareholderRepository = shareholderRepository;
         this.eventPublisher = eventPublisher;
         this.matcher = matcher;
-        this.orderIdRqIdMap = new HashMap<Long, Long>();
+        this.orderIdRqIdMap = new HashMap<Long, Long>(); // TODO Convert to Object
     }
 
     // TODO move all of these to EventPublisher.

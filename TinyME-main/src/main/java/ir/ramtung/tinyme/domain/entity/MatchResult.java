@@ -8,48 +8,51 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class MatchResult {
+    private final LinkedList<Trade> trades;
     private final MatchingOutcome outcome;
     private final Order remainder;
-    private final LinkedList<Trade> trades;
-    public static MatchResult executed(Order remainder, List<Trade> trades) {
-        return new MatchResult(MatchingOutcome.EXECUTED, remainder, new LinkedList<>(trades));
-    }
-
-    public static MatchResult notEnoughCredit() {
-        return new MatchResult(MatchingOutcome.NOT_ENOUGH_CREDIT, null, new LinkedList<>());
-    }
-    public static MatchResult notEnoughPositions() {
-        return new MatchResult(MatchingOutcome.NOT_ENOUGH_POSITIONS, null, new LinkedList<>());
-    }
-
-    public static MatchResult notMetMEQValue() {
-        return new MatchResult(MatchingOutcome.NOT_MET_MEQ_VALUE, null, new LinkedList<>());
-    }
-
-    public static MatchResult notMetLastTradePrice() {
-        return new MatchResult(MatchingOutcome.NOT_MET_LAST_TRADE_PRICE, null, new LinkedList<>());
-    }
-
-    public static MatchResult stopLimitOrderIsNotAllowedInAuction() {
-        return new MatchResult(MatchingOutcome.STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION, null, new LinkedList<>());
-    }
-
-    public static MatchResult meqOrderIsNotAllowedInAuction() {
-        return new MatchResult(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION, null, new LinkedList<>());
-    }
-
-    public static MatchResult executed(List<Trade> trades) {
-        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>(trades));
-    }
-
-    public static MatchResult executed() {
-        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION, null, new LinkedList<>());
-    }
-
     private MatchResult(MatchingOutcome outcome, Order remainder, LinkedList<Trade> trades) {
         this.outcome = outcome;
         this.remainder = remainder;
         this.trades = trades;
+    }
+
+    public static MatchResult executed(Order remainder, List<Trade> trades) {
+        return new MatchResult(MatchingOutcome.EXECUTED,
+                remainder, new LinkedList<>(trades));
+    }
+    public static MatchResult executed(List<Trade> trades) {
+        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION,
+                null, new LinkedList<>(trades));
+    }
+
+    public static MatchResult notEnoughCredit() {
+        return new MatchResult(MatchingOutcome.NOT_ENOUGH_CREDIT,
+                null, new LinkedList<>());
+    }
+    public static MatchResult notEnoughPositions() {
+        return new MatchResult(MatchingOutcome.NOT_ENOUGH_POSITIONS,
+                null, new LinkedList<>());
+    }
+    public static MatchResult notMetMEQValue() {
+        return new MatchResult(MatchingOutcome.NOT_MET_MEQ_VALUE,
+                null, new LinkedList<>());
+    }
+    public static MatchResult notMetLastTradePrice() {
+        return new MatchResult(MatchingOutcome.NOT_MET_LAST_TRADE_PRICE,
+                null, new LinkedList<>());
+    }
+    public static MatchResult stopLimitOrderIsNotAllowedInAuction() {
+        return new MatchResult(MatchingOutcome.STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION,
+                null, new LinkedList<>());
+    }
+    public static MatchResult meqOrderIsNotAllowedInAuction() {
+        return new MatchResult(MatchingOutcome.MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION,
+                null, new LinkedList<>());
+    }
+    public static MatchResult executed() {
+        return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION,
+                null, new LinkedList<>());
     }
 
     public MatchingOutcome outcome() {
