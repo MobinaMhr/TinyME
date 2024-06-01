@@ -48,15 +48,14 @@ public class InactiveOrderBook extends OrderBook{
     }
 
     @Override
-    public boolean removeByOrderId(Side side, long orderId) {
+    public void removeByOrderId(Side side, long orderId) {
         var inactiveIt = getInactiveQueue(side).listIterator();
         while (inactiveIt.hasNext()) {
             if (inactiveIt.next().getOrderId() == orderId) {
                 inactiveIt.remove();
-                return true;
+                return;
             }
         }
-        return false;
     }
     private StopLimitOrder findEligibleOrder(LinkedList<StopLimitOrder> orderQueue,
                                              int price) {
