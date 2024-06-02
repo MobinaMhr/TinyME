@@ -14,6 +14,7 @@ import ir.ramtung.tinyme.repository.ShareholderRepository;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -118,36 +119,29 @@ public class OrderHandler {
 
             // TODO Should we move this if before previous if?
             if(oldMatchingState == MatchingState.AUCTION) {
-                executeActivatedSLO(security, changeMatchingStateRq);
+                executeActivatedSLO(security, changeMatchingStateRq.getTargetState());
             }
         } catch (InvalidRequestException e) {
             eventPublisher.publishChangeMatchingStateRqRejectedEvent(changeMatchingStateRq);
         }
     }
-    public void executeActivatedSLO(Security security, ChangeMatchingStateRq changeMatchingStateRq){
-        Order activatedOrder;
-        while ((activatedOrder = (security.getActivateCandidateOrder(matcher.getLastTradePrice()))) != null) {
-            if(changeMatchingStateRq != null && changeMatchingStateRq.getTargetState() == MatchingState.AUCTION){
-                matcher.auctionExecute(activatedOrder);
-                eventPublisher.publishOrderActivateEvent(orderIdRqIdMap.get(activatedOrder.getOrderId()), activatedOrder.getOrderId());
-                continue;
-            }
-
-            MatchResult matchResult = matcher.execute(activatedOrder);
-
-            // TODO: Duplicate
-            switch (matchResult.outcome()) {
+    public void executeActivatedSLO(Security security, MatchingState targetState){
+        ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
+        System.out.println(results);
+        for (MatchResult result: results){
+            switch (result.outcome()) {
                 case NOT_ENOUGH_CREDIT:
-                    eventPublisher.publishOrderRejectedEvent(orderIdRqIdMap.get(activatedOrder.getOrderId()),
-                            activatedOrder.getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT));
-                    return;
-                case EXECUTED:
-                    eventPublisher.publishOrderActivateEvent(orderIdRqIdMap.get(matchResult.remainder().getOrderId()),
-                            activatedOrder.getOrderId());
+                    eventPublisher.publishOrderRejectedEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                            result.remainder().getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT));
+                    break;
+                case ACTIVATED:
+                    eventPublisher.publishOrderActivateEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                            result.remainder().getOrderId());
                     break;
             }
-            if (!matchResult.trades().isEmpty())
-                eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(activatedOrder.getOrderId()), activatedOrder.getOrderId(), matchResult);
+            if (!result.trades().isEmpty())
+                eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                        result.remainder().getOrderId(), result);
         }
     }
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {

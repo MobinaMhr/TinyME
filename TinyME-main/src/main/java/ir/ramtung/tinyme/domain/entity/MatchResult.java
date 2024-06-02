@@ -25,7 +25,10 @@ public final class MatchResult {
         return new MatchResult(MatchingOutcome.EXECUTED_IN_AUCTION,
                 null, new LinkedList<>(trades));
     }
-
+    public static MatchResult activated(Order order) {
+        return new MatchResult(MatchingOutcome.ACTIVATED,
+                order, new LinkedList<>());
+    }
     public static MatchResult notEnoughCredit() {
         return new MatchResult(MatchingOutcome.NOT_ENOUGH_CREDIT,
                 null, new LinkedList<>());

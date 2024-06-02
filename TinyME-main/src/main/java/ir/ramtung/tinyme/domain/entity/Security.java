@@ -191,8 +191,25 @@ public class Security {
         return matchResult;
     }
 
-    public Order getActivateCandidateOrder(int lastTradePrice) {
+    private Order getActivateCandidateOrder(int lastTradePrice) {
         return getInactiveOrderBook().getActivationCandidateOrder(lastTradePrice);
+    }
+
+    public ArrayList<MatchResult> activateStopLimitOrder(Matcher matcher, MatchingState targetState){
+        Order activatedOrder = null;
+        ArrayList<MatchResult> results = new ArrayList<>();
+        while ((activatedOrder = (this.getActivateCandidateOrder(matcher.getLastTradePrice()))) != null) {
+            results.add(MatchResult.activated(activatedOrder));
+
+            if(targetState == MatchingState.AUCTION){
+                matcher.auctionExecute(activatedOrder);
+                continue;
+            }
+
+            results.add(matcher.execute(activatedOrder));
+
+        }
+        return results;
     }
 
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
