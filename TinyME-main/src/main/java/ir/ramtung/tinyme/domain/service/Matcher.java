@@ -24,7 +24,7 @@ public class Matcher {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
-    public MatchResult match(StopLimitOrder newSLOrder) {
+    public MatchResult matchSLO(StopLimitOrder newSLOrder) {
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         if (newSLOrder.getSide() == Side.BUY
                 && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
@@ -67,7 +67,7 @@ public class Matcher {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
-            MatchResult sloResult = match(stopLimitOrder);
+            MatchResult sloResult = matchSLO(stopLimitOrder);
             if (sloResult != null) return sloResult;
         }
 
