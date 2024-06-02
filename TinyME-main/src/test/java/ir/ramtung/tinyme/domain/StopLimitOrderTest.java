@@ -138,15 +138,13 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), -1);
 
         orderHandler.handleEnterOrder(enterOrderRq);
-//        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
-//        verify(eventPublisher).publishOrderRejectedEvent(orderRejectedCaptor.capture().getRequestId(),
-//                orderRejectedCaptor.capture().getOrderId(),orderRejectedCaptor.capture().getErrors());
-//        orderRejectedCaptor.capture();
-//        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
-//        assertThat(outputEvent.getOrderId()).isEqualTo(2);
-//        assertThat(outputEvent.getErrors()).contains(
-//                Message.STOP_PRICE_NOT_POSITIVE
-//        );
+        ArgumentCaptor<List<String>> orderRejectedCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventPublisher).publishOrderRejectedEvent(any(Long.class),any(Long.class),
+                orderRejectedCaptor.capture());
+        var outputEvent = orderRejectedCaptor.getValue();
+        assertThat(outputEvent).contains(
+                Message.STOP_PRICE_NOT_POSITIVE
+        );
     }
     @Test
     void check_if_inActive_buy_order_updates_price() {

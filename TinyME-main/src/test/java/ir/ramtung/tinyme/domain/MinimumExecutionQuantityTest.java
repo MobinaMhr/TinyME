@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -178,11 +179,11 @@ public class MinimumExecutionQuantityTest {
                 shareholder.getShareholderId(), 0, -5);
 
         orderHandler.handleEnterOrder(enterOrderRq);
-        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
-//        verify(eventPublisher).(orderRejectedCaptor.capture());
-        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
-        assertThat(outputEvent.getOrderId()).isEqualTo(2);
-        assertThat(outputEvent.getErrors()).contains(
+        ArgumentCaptor<List<String>> orderRejectedMessageCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventPublisher).publishOrderRejectedEvent(any(Long.class),any(Long.class),
+                orderRejectedMessageCaptor.capture());
+        var outputEventMessage = orderRejectedMessageCaptor.getValue();
+        assertThat(outputEventMessage).contains(
                 Message.MEQ_NOT_POSITIVE
         );
     }
@@ -193,11 +194,11 @@ public class MinimumExecutionQuantityTest {
                 shareholder.getShareholderId(), 0, 300);
 
         orderHandler.handleEnterOrder(enterOrderRq);
-        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
-//        verify(eventPublisher).publish(orderRejectedCaptor.capture());
-        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
-        assertThat(outputEvent.getOrderId()).isEqualTo(2);
-        assertThat(outputEvent.getErrors()).contains(
+        ArgumentCaptor<List<String>> orderRejectedMessageCaptor = ArgumentCaptor.forClass(List.class);
+        verify(eventPublisher).publishOrderRejectedEvent(any(Long.class),any(Long.class),
+                orderRejectedMessageCaptor.capture());
+        var outputEventMessage = orderRejectedMessageCaptor.getValue();
+        assertThat(outputEventMessage).contains(
                 Message.MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY
         );
 
