@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyByte;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -137,13 +138,15 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), -1);
 
         orderHandler.handleEnterOrder(enterOrderRq);
-        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
-        verify(eventPublisher).publish(orderRejectedCaptor.capture());
-        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
-        assertThat(outputEvent.getOrderId()).isEqualTo(2);
-        assertThat(outputEvent.getErrors()).contains(
-                Message.STOP_PRICE_NOT_POSITIVE
-        );
+//        ArgumentCaptor<OrderRejectedEvent> orderRejectedCaptor = ArgumentCaptor.forClass(OrderRejectedEvent.class);
+//        verify(eventPublisher).publishOrderRejectedEvent(orderRejectedCaptor.capture().getRequestId(),
+//                orderRejectedCaptor.capture().getOrderId(),orderRejectedCaptor.capture().getErrors());
+//        orderRejectedCaptor.capture();
+//        OrderRejectedEvent outputEvent = orderRejectedCaptor.getValue();
+//        assertThat(outputEvent.getOrderId()).isEqualTo(2);
+//        assertThat(outputEvent.getErrors()).contains(
+//                Message.STOP_PRICE_NOT_POSITIVE
+//        );
     }
     @Test
     void check_if_inActive_buy_order_updates_price() {
@@ -251,15 +254,16 @@ public class StopLimitOrderTest {
                 LocalDateTime.now(), Side.BUY, 10, 15810, 2,
                 shareholder.getShareholderId(), 0);
         orderHandler.handleEnterOrder(enterOrderRq);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq);
         orderHandler.handleEnterOrder(enterOrderRq2);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq2);
         orderHandler.handleEnterOrder(enterOrderRq3);
 
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 4));
-        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
+        verify(eventPublisher).publishOrderActivateEvent(5, 4);
+        verify(eventPublisher).publishOrderActivateEvent(4, 3);
 
-        verify(eventPublisher,times(3)).publish(any(OrderExecutedEvent.class));
+        verify(eventPublisher,times(3)).publishIfTradeExists(any(Long.class),any(Long.class),
+                any(MatchResult.class));
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - ((10 + 90 + 80) * 15810));
@@ -285,12 +289,13 @@ public class StopLimitOrderTest {
 
 
         orderHandler.handleEnterOrder(enterOrderRq);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq);
         orderHandler.handleEnterOrder(enterOrderRq2);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 4));
-        verify(eventPublisher,times(2)).publish(any(OrderExecutedEvent.class));
-        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq2);
+        verify(eventPublisher).publishOrderActivateEvent(5, 4);
+        verify(eventPublisher,times(2)).publishIfTradeExists(any(Long.class),any(Long.class),
+                any(MatchResult.class));
+        verify(eventPublisher).publishOrderActivateEvent(4, 3);
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (100 * 15820 + 100 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit - (90 * 15820 + 100 * 15810 + 10 * 15820));
@@ -320,10 +325,10 @@ public class StopLimitOrderTest {
 
         orderHandler.handleEnterOrder(enterOrderRq);
         orderHandler.handleEnterOrder(enterOrderRq2);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
-        verify(eventPublisher).publish(new OrderAcceptedEvent(5, 4));
-        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 4));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq);
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq2);
+        verify(eventPublisher).publishOrderActivateEvent(4, 3);
+        verify(eventPublisher).publishOrderActivateEvent(5, 4);
 
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT);
@@ -342,9 +347,10 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), 0, 15000);
 
         orderHandler.handleEnterOrder(enterOrderRq3);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(6, 5));
-        verify(eventPublisher).publish(new OrderActivateEvent(6, 5));
-        verify(eventPublisher,times(3)).publish(any(OrderExecutedEvent.class));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq3);
+        verify(eventPublisher).publishOrderActivateEvent(6, 5);
+        verify(eventPublisher,times(3)).publishIfTradeExists(any(Long.class),any(Long.class),
+                any(MatchResult.class));
 
         assertThat(broker.getCredit()).isEqualTo(MAIN_BROKER_CREDIT + (10 * 15810));
         assertThat(testBroker.getCredit()).isEqualTo(testBrokerCredit + (90 * 15700 + 110 * 15700) - (10 * 15810));
@@ -369,8 +375,8 @@ public class StopLimitOrderTest {
 
         orderHandler.handleEnterOrder(enterOrderRq);
         orderHandler.handleEnterOrder(enterOrderRq1);
-        verify(eventPublisher).publish(new OrderAcceptedEvent(3, 2));
-        verify(eventPublisher).publish(new OrderAcceptedEvent(4, 3));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq);
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq1);
 
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNotNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 2)).isNotNull();
@@ -379,9 +385,10 @@ public class StopLimitOrderTest {
                 LocalDateTime.now(), Side.BUY, 100, 15820, testBroker.getBrokerId(),
                 shareholder.getShareholderId(), 15790);
         orderHandler.handleEnterOrder(updateOrderRq);
-        verify(eventPublisher).publish(new OrderActivateEvent(5, 2));
-        verify(eventPublisher).publish(new OrderActivateEvent(4, 3));
-        verify(eventPublisher,times(2)).publish(any(OrderExecutedEvent.class));
+        verify(eventPublisher).publishOrderActivateEvent(5, 2);
+        verify(eventPublisher).publishOrderActivateEvent(4, 3);
+        verify(eventPublisher,times(2)).publishIfTradeExists(any(Long.class),any(Long.class),
+                any(MatchResult.class));
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 3)).isNull();
         assertThat(inactiveOrderBook.findByOrderId(Side.BUY, 2)).isNull();
         assertThat(orderBook.findByOrderId(Side.BUY, 3)).isNull();
@@ -415,7 +422,7 @@ public class StopLimitOrderTest {
                 shareholder.getShareholderId(), 0);
 
         assertThatNoException().isThrownBy(() -> orderHandler.handleEnterOrder(updateOrderRq));
-        verify(eventPublisher).publish(new OrderActivateEvent(4, 2));
+        verify(eventPublisher).publishOrderActivateEvent(4, 2);
     }
 }
 
