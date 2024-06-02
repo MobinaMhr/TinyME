@@ -16,12 +16,10 @@ public class Matcher {
     private int lastTradePrice;
     public int reopeningPrice = 0;
     public int maxTradableQuantity = 0;
-
     private void updateLastTradePrice(MatchResult result) {
         if (result.trades().isEmpty()) return;
         lastTradePrice = result.trades().getLast().getPrice();
     }
-
     private Trade createNewTradeFor(Order order, int price, Order matchingOrder) {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
