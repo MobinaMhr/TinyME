@@ -74,29 +74,16 @@ public class Security {
         else {
             return matcher.auctionExecute(order);
         }
-//        MatchResult result = null;
-//        Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
-//        if (currentMatchingState == MatchingState.AUCTION) {
-//            if (order instanceof StopLimitOrder)
-//                return MatchResult.stopLimitOrderIsNotAllowedInAuction();
-//            if (order.getMinimumExecutionQuantity() > 0)
-//                return MatchResult.meqOrderIsNotAllowedInAuction();
-//            result = matcher.auctionExecute(order);
-//        }
-//        else if (currentMatchingState == MatchingState.CONTINUOUS) {
-//            result = matcher.execute(order);
-//        }
-//        return result;
     }
 
-    private Order getOrderToDelete(Side orderSide, long orderId) throws InvalidRequestException {
-        Order order;
-        order = inactiveOrderBook.findByOrderId(orderSide, orderId);
+    private Order findOrder(Side orderSide, long orderId, String forbiddenActionMsg) throws InvalidRequestException {
+        Order order = inactiveOrderBook.findByOrderId(orderSide, orderId);
         if (order != null && currentMatchingState == MatchingState.AUCTION) {
-            throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
+            throw new InvalidRequestException(forbiddenActionMsg);
         }
-        if (order != null && currentMatchingState == MatchingState.CONTINUOUS) return order;
-        order = orderBook.findByOrderId(orderSide, orderId);
+        if (order == null) {
+            order = orderBook.findByOrderId(orderSide, orderId);
+        }
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
@@ -104,8 +91,8 @@ public class Security {
     }
 
     public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
-//      TODO : use Split Temporary Variable <Composint> may be another part of code has same issue
-        Order order = getOrderToDelete(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        Order order = findOrder(deleteOrderRq.getSide(), deleteOrderRq.getOrderId(),
+                Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         if (order.getSide() == Side.BUY) {
             order.getBroker().increaseCreditBy(order.getValue());
         }
@@ -116,23 +103,6 @@ public class Security {
         if (currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
         }
-    }
-
-    private Order findOrder(EnterOrderRq updateOrderRq) throws InvalidRequestException {
-        Order order = inactiveOrderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-        if (currentMatchingState == MatchingState.AUCTION && order != null) {
-            throw new InvalidRequestException(Message.CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
-        }
-
-        if (order == null) {
-            order = orderBook.findByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
-        }
-
-        if (order == null) {
-            throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
-        }
-
-        return order;
     }
 
     private void validateOrder(EnterOrderRq updateOrderRq, Order order) throws InvalidRequestException {
@@ -161,7 +131,8 @@ public class Security {
     }
 
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
-        Order order = findOrder(updateOrderRq);
+        Order order = findOrder(updateOrderRq.getSide(), updateOrderRq.getOrderId(),
+                Message.CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         validateOrder(updateOrderRq, order);
 
         // Check enough position on
@@ -223,6 +194,7 @@ public class Security {
     public Order getActivateCandidateOrder(int lastTradePrice) {
         return getInactiveOrderBook().getActivationCandidateOrder(lastTradePrice);
     }
+
     public MatchResult updateMatchingState(MatchingState newMatchingState, Matcher matcher) {
         MatchResult matchResult = null;
         if (this.currentMatchingState == MatchingState.AUCTION) {
