@@ -71,8 +71,9 @@ public class OrderHandler {
             eventPublisher.publishOrderUpdatedEvent(enterOrderRq);
             orderIdRqIdMap.put(enterOrderRq.getOrderId(), enterOrderRq.getRequestId());
         }
+        if (!matchResult.trades().isEmpty())
+            eventPublisher.publishIfTradeExists(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult);
 
-        eventPublisher.publishIfTradeExists(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult);
         return false;
     }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
@@ -112,7 +113,8 @@ public class OrderHandler {
 
             // Shall we change ? TODO
             if (result == null || result.trades() == null) return;
-            eventPublisher.publishTradeEvents(result, security.getIsin());
+            for (Trade trade : result.trades())
+                eventPublisher.publishTradeEvents(trade, security.getIsin());
 
             // TODO Should we move this if before previous if?
             if(oldMatchingState == MatchingState.AUCTION) {
@@ -144,7 +146,8 @@ public class OrderHandler {
                             activatedOrder.getOrderId());
                     break;
             }
-            eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(activatedOrder.getOrderId()), activatedOrder.getOrderId(), matchResult);
+            if (!matchResult.trades().isEmpty())
+                eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(activatedOrder.getOrderId()), activatedOrder.getOrderId(), matchResult);
         }
     }
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {

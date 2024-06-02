@@ -45,7 +45,6 @@ public class EventPublisher {
         this.publish(new OrderUpdatedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId()));
     }
     public void publishIfTradeExists(long requestId, long orderId, MatchResult matchResult) {
-        if (matchResult.trades().isEmpty()) return;
         this.publish(new OrderExecutedEvent(requestId, orderId,
                 matchResult.trades().stream().map(TradeDTO::new).collect(Collectors.toList())));
     }
@@ -62,13 +61,11 @@ public class EventPublisher {
     public void publishOrderRejectedEvent(long requestId, long orderId, List<String> msgList) {
         this.publish(new OrderRejectedEvent(requestId, orderId, msgList));
     }
-    public void publishTradeEvents(MatchResult result, String isin) {
-        for (Trade trade : result.trades()) {
-            this.publish(
-                    new TradeEvent(isin, trade.getPrice(), trade.getQuantity(),
-                            trade.getBuy().getOrderId(), trade.getSell().getOrderId())
-            );
-        }
+    public void publishTradeEvents(Trade trade, String isin) {
+        this.publish(
+                new TradeEvent(isin, trade.getPrice(), trade.getQuantity(),
+                        trade.getBuy().getOrderId(), trade.getSell().getOrderId())
+        );
     }
     public void publishOrderDeletedEvent(DeleteOrderRq deleteOrderRq) {
         this.publish(new OrderDeletedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId()));

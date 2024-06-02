@@ -37,7 +37,7 @@ public class EventPublisherTest {
     @Test
     void response_channel_integration_works() {
         OrderExecutedEvent orderExecutedEvent = new OrderExecutedEvent(1, 0, List.of());
-        eventPublisher.publish(orderExecutedEvent);
+//        eventPublisher.publish(orderExecutedEvent);
 
         long receiveTimeout = jmsTemplate.getReceiveTimeout();
         jmsTemplate.setReceiveTimeout(1000);

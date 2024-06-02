@@ -16,6 +16,7 @@ import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
 import ir.ramtung.tinyme.repository.BrokerRepository;
 import ir.ramtung.tinyme.repository.SecurityRepository;
 import ir.ramtung.tinyme.repository.ShareholderRepository;
+import net.bytebuddy.asm.Advice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -77,11 +78,15 @@ public class OrderHandlerTest {
         Order incomingSellOrder = new Order(200, security, Side.SELL, 300, 15450, broker2, shareholder);
         security.getOrderBook().enqueue(matchingBuyOrder);
 
-        orderHandler.handleEnterOrder(EnterOrderRq.createNewOrderRq(1, "ABC", 200, LocalDateTime.now(), Side.SELL, 300, 15450, 2, shareholder.getShareholderId(), 0));
+        EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(1, "ABC", 200, LocalDateTime.now(),
+                Side.SELL, 300, 15450, 2, shareholder.getShareholderId(), 0);
+        orderHandler.handleEnterOrder(enterOrderRq);
 
         Trade trade = new Trade(security, matchingBuyOrder.getPrice(), incomingSellOrder.getQuantity(),
                 matchingBuyOrder, incomingSellOrder);
-        verify(eventPublisher).publish((new OrderAcceptedEvent(1, 200)));
+        verify(eventPublisher).publishAcceptedOrderEvent(enterOrderRq);
+        verify(eventPublisher).publishIfTradeExists(1, 200, MatchResult.executed());
+        long requestId, long orderId, MatchResult matchResult
         verify(eventPublisher).publish(new OrderExecutedEvent(1, 200, List.of(new TradeDTO(trade))));
     }
 
