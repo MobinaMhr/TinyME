@@ -54,47 +54,65 @@ public class Security {
     }
 
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
+        // Check enough position on
+        int position = orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity();
         if (enterOrderRq.getSide() == Side.SELL &&
-                !shareholder.hasEnoughPositionsOn(this,
-                        orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity())) {
+                !shareholder.hasEnoughPositionsOn(this, position)) {
             return MatchResult.notEnoughPositions();
         }
 
-        MatchResult result = null;
         Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
-        if (currentMatchingState == MatchingState.AUCTION) {
-            if (order instanceof StopLimitOrder) {
-                return MatchResult.stopLimitOrderIsNotAllowedInAuction();
-            }
-            if (order.getMinimumExecutionQuantity() > 0) {
-                return MatchResult.meqOrderIsNotAllowedInAuction();
-            }
-            result = matcher.auctionExecute(order);
-        } else if (currentMatchingState == MatchingState.CONTINUOUS) {
-            result = matcher.execute(order);
+        if (currentMatchingState == MatchingState.CONTINUOUS) {
+            return matcher.execute(order);
         }
-        return result;
+        else if (order instanceof StopLimitOrder) {
+            return MatchResult.stopLimitOrderIsNotAllowedInAuction();
+        }
+        else if (order.getMinimumExecutionQuantity() > 0) {
+            return MatchResult.meqOrderIsNotAllowedInAuction();
+        }
+        else {
+            return matcher.auctionExecute(order);
+        }
+//        MatchResult result = null;
+//        Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
+//        if (currentMatchingState == MatchingState.AUCTION) {
+//            if (order instanceof StopLimitOrder)
+//                return MatchResult.stopLimitOrderIsNotAllowedInAuction();
+//            if (order.getMinimumExecutionQuantity() > 0)
+//                return MatchResult.meqOrderIsNotAllowedInAuction();
+//            result = matcher.auctionExecute(order);
+//        }
+//        else if (currentMatchingState == MatchingState.CONTINUOUS) {
+//            result = matcher.execute(order);
+//        }
+//        return result;
     }
 
-    public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
-        // TODO : use Split Temporary Variable <Composint> may be another part of code has same issue(This is what i remember)
-        Order order = inactiveOrderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        if (order == null) {
-            order = orderBook.findByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        }
-        else if(currentMatchingState == MatchingState.AUCTION){
+    private Order getOrderToDelete(Side orderSide, long orderId) throws InvalidRequestException {
+        Order order;
+        order = inactiveOrderBook.findByOrderId(orderSide, orderId);
+        if (order != null && currentMatchingState == MatchingState.AUCTION) {
             throw new InvalidRequestException(Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         }
-
+        if (order != null && currentMatchingState == MatchingState.CONTINUOUS) return order;
+        order = orderBook.findByOrderId(orderSide, orderId);
         if (order == null) {
             throw new InvalidRequestException(Message.ORDER_ID_NOT_FOUND);
         }
+        return order;
+    }
+
+    public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
+//      TODO : use Split Temporary Variable <Composint> may be another part of code has same issue
+        Order order = getOrderToDelete(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         if (order.getSide() == Side.BUY) {
             order.getBroker().increaseCreditBy(order.getValue());
         }
 
         orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+
         if (currentMatchingState == MatchingState.AUCTION) {
             matcher.calculateReopeningPrice(orderBook);
         }
@@ -131,12 +149,6 @@ public class Security {
         }
     }
 
-    private boolean doesHaveEnoughPosition(EnterOrderRq updateOrderRq, Order order) {
-        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
-                - order.getQuantity() + updateOrderRq.getQuantity();
-        return order.getShareholder().hasEnoughPositionsOn(this, position);
-    }
-
     private static boolean doesLosePriority(EnterOrderRq updateOrderRq, Order order, boolean quantityIncreased) {
         double newPrice = updateOrderRq.getPrice();
         boolean priceChanged = newPrice != order.getPrice();
@@ -151,8 +163,12 @@ public class Security {
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = findOrder(updateOrderRq);
         validateOrder(updateOrderRq, order);
+
+        // Check enough position on
+        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
+                - order.getQuantity() + updateOrderRq.getQuantity();
         if (updateOrderRq.getSide() == Side.SELL
-                && !doesHaveEnoughPosition(updateOrderRq, order)) {
+                && !order.getShareholder().hasEnoughPositionsOn(this, position)) {
             return MatchResult.notEnoughPositions();
         }
 
