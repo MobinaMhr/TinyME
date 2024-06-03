@@ -105,6 +105,20 @@ public class Order {
         }
     }
 
+    // Why we don't have this
+//    public boolean minimumExecutionQuantitySatisfied() {
+//        if (initialQuantity - quantity < minimumExecutionQuantity)
+//            return false;
+//        return true;
+//    }
+
+//    public void markAsQueued() {
+//        status = OrderStatus.QUEUED;
+//    }
+//
+//    public void markAsNew() {
+//        status = OrderStatus.NEW;
+//    }
     public void queue() {
         status = OrderStatus.QUEUED;
     }
@@ -113,6 +127,14 @@ public class Order {
         return newQuantity > quantity;
     }
 
+//    public void updateFromRequest(EnterOrderRq updateOrderRq) {
+//        if (quantity != updateOrderRq.getQuantity()) {
+//            int executedQuantity = initialQuantity - quantity;
+//            initialQuantity = updateOrderRq.getQuantity() + executedQuantity;
+//        }
+//        quantity = updateOrderRq.getQuantity();
+//        price = updateOrderRq.getPrice();
+//    }
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         quantity = updateOrderRq.getQuantity();
         price = updateOrderRq.getPrice();

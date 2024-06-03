@@ -53,9 +53,8 @@ public class IcebergOrder extends Order {
 
     @Override
     public int getQuantity() {
-        if (status == OrderStatus.NEW) {
+        if (status == OrderStatus.NEW)
             return super.getQuantity();
-        }
         return displayedQuantity;
     }
 
@@ -66,9 +65,8 @@ public class IcebergOrder extends Order {
             return;
         }
 
-        if (amount > displayedQuantity) {
+        if (amount > displayedQuantity)
             throw new IllegalArgumentException();
-        }
 
         quantity -= amount;
         displayedQuantity -= amount;
@@ -78,12 +76,23 @@ public class IcebergOrder extends Order {
         displayedQuantity = Math.min(quantity, peakSize);
     }
 
+    // Why we don't have this
+    //    @Override
+//    public boolean minimumExecutionQuantitySatisfied() {
+//        displayedQuantity = Math.min(quantity, peakSize);
+//        return super.minimumExecutionQuantitySatisfied();
+//    }
+
     @Override
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         super.updateFromRequest(updateOrderRq);
         if (peakSize < updateOrderRq.getPeakSize()) {
             displayedQuantity = Math.min(quantity, updateOrderRq.getPeakSize());
         }
+        // Why we don't have this
+//        else if (peakSize > updateOrderRq.getPeakSize()) {
+//            displayedQuantity = Math.min(displayedQuantity, updateOrderRq.getPeakSize());
+//        }
         peakSize = updateOrderRq.getPeakSize();
     }
 }
