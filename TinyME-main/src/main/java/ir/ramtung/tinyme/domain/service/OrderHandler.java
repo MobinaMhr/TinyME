@@ -43,7 +43,7 @@ public class OrderHandler {
 
     // TODO move all of these to EventPublisher.
 
-    public boolean resultPublisher(MatchResult matchResult, EnterOrderRq enterOrderRq,
+    public void resultPublisher(MatchResult matchResult, EnterOrderRq enterOrderRq,
                                    boolean isTypeStopLimitOrder, Security security) {
         switch (matchResult.outcome()) {
             case EXECUTED:
@@ -58,14 +58,14 @@ public class OrderHandler {
             case NOT_ENOUGH_POSITIONS:
             case NOT_MET_MEQ_VALUE:
                 eventPublisher.publishOrderRejectedEvent(enterOrderRq, matchResult);
-                return true;
+                return;
             case NOT_MET_LAST_TRADE_PRICE:
                 eventPublisher.publishAcceptedOrderEvent(enterOrderRq);
                 orderIdRqIdMap.put(enterOrderRq.getOrderId(), enterOrderRq.getRequestId());
-                return true;
+                return;
             case MEQ_ORDER_IS_NOT_ALLOWED_IN_AUCTION:
             case STOP_LIMIT_ORDER_IS_NOT_ALLOWED_IN_AUCTION:
-                return true;
+                return;
         }
         if (enterOrderRq.getRequestType() == OrderEntryType.NEW_ORDER) {
             eventPublisher.publishAcceptedOrderEvent(enterOrderRq);
@@ -76,7 +76,11 @@ public class OrderHandler {
         }
         if (!matchResult.trades().isEmpty())
             eventPublisher.publishIfTradeExists(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult);
-
+    }
+    private boolean shouldInactiveOrdersActivate(MatchResult matchResult) {
+        if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED ||
+                matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION)
+            return true;
         return false;
     }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
@@ -96,11 +100,10 @@ public class OrderHandler {
                         .findByOrderId(enterOrderRq.getSide(),enterOrderRq.getOrderId()) != null;
                 matchResult = security.updateOrder(enterOrderRq, matcher);
             }
-
-            if(matchResult != null && !resultPublisher(matchResult, enterOrderRq, isTypeStopLimitOrder, security)) {
+            resultPublisher(matchResult, enterOrderRq, isTypeStopLimitOrder, security);
+            if(shouldInactiveOrdersActivate(matchResult)) {
                 executeActivatedSLO(security, null);
             }
-
         } catch (InvalidRequestException e) {
             eventPublisher.publishOrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), e.getReasons());
         }
