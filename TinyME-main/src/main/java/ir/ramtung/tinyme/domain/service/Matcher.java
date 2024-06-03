@@ -5,6 +5,7 @@ import ir.ramtung.tinyme.messaging.Message;
 import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -17,6 +18,9 @@ public class Matcher {
     public int reopeningPrice = 0;
     public int maxTradableQuantity = 0;
 
+    @Autowired
+    private MatchingControlList controls;
+
     private Trade createNewTradeFor(Order order, int price, Order matchingOrder) {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
@@ -24,7 +28,7 @@ public class Matcher {
     private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         // TODO::! notEnoughCredit() : 3
-        if (newSLOrder.getSide() == Side.BUY && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
+        if (controls.canTrade(newSLOrder, null) != MatchingOutcome.OK) {
             return MatchResult.notEnoughCredit();
         }
         if (!newSLOrder.canMeetLastTradePrice(lastTradePrice)) {
@@ -34,34 +38,30 @@ public class Matcher {
         return null;
     }
 
-    private MatchResult validateMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
+    private MatchResult processMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
         // TODO::! notEnoughCredit() : 3
-        if (newOrder.getSide() == Side.BUY && !trade.buyerHasEnoughCredit()) {
+        if (controls.canTrade(newOrder, trade) != MatchingOutcome.OK) {
             rollbackTrades(newOrder, trades);
             return MatchResult.notEnoughCredit();
         }
         // TODO::! decreaseBuyersCredit() 1-2
-        if (newOrder.getSide() == Side.BUY) trade.decreaseBuyersCredit();
-
-        trade.increaseSellersCredit();
-        trades.add(trade);
         return null;
     }
 
-    private void updateOrderQuantities(Order newOrder, Order matchingOrder, OrderBook orderBook) {
-        if (newOrder.getQuantity() < matchingOrder.getQuantity()) {
-            matchingOrder.decreaseQuantity(newOrder.getQuantity());
-            newOrder.makeQuantityZero();
-            return;
-        }
-        newOrder.decreaseQuantity(matchingOrder.getQuantity());
-        orderBook.removeFirst(matchingOrder.getSide());
-        if (matchingOrder instanceof IcebergOrder icebergOrder) {
-            icebergOrder.decreaseQuantity(matchingOrder.getQuantity());
-            icebergOrder.replenish();
-            if (icebergOrder.getQuantity() > 0) orderBook.enqueue(icebergOrder);
-        }
-    }
+//    private void updateOrderQuantities(Order newOrder, Order matchingOrder, OrderBook orderBook) {
+//        if (newOrder.getQuantity() < matchingOrder.getQuantity()) {
+//            matchingOrder.decreaseQuantity(newOrder.getQuantity());
+//            newOrder.makeQuantityZero();
+//            return;
+//        }
+//        newOrder.decreaseQuantity(matchingOrder.getQuantity());
+//        orderBook.removeFirst(matchingOrder.getSide());
+//        if (matchingOrder instanceof IcebergOrder icebergOrder) {
+//            icebergOrder.decreaseQuantity(matchingOrder.getQuantity());
+//            icebergOrder.replenish();
+//            if (icebergOrder.getQuantity() > 0) orderBook.enqueue(icebergOrder);
+//        }
+//    }
     public MatchResult match(Order newOrder) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
@@ -75,9 +75,12 @@ public class Matcher {
             Order matchingOrder = orderBook.matchWithFirst(newOrder);
             if (matchingOrder == null) break;
             Trade trade = createNewTradeFor(newOrder, matchingOrder.getPrice(), matchingOrder);
-            MatchResult tradeResult = validateMatchedTrade(trade, newOrder, trades);
+            MatchResult tradeResult = processMatchedTrade(trade, newOrder, trades);
             if (tradeResult != null) return tradeResult;
-            updateOrderQuantities(newOrder, matchingOrder, orderBook);
+
+            trades.add(trade);
+            controls.tradeAccepted(newOrder, trade);
+            controls.tradeAccepted2(newOrder, matchingOrder, trade);
         }
         return MatchResult.executed(newOrder, trades);
     }
