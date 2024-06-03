@@ -19,7 +19,8 @@ public class Matcher {
     public int maxTradableQuantity = 0;
 
     @Autowired
-    private MatchingControlList controls;
+    public MatchingControlList controls;
+
 
     private Trade createNewTradeFor(Order order, int price, Order matchingOrder) {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
@@ -27,7 +28,6 @@ public class Matcher {
     }
     private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
-        // TODO::! notEnoughCredit() : 3
         if (controls.canTrade(newSLOrder, null) != MatchingOutcome.OK) {
             return MatchResult.notEnoughCredit();
         }
@@ -37,31 +37,6 @@ public class Matcher {
         }
         return null;
     }
-
-    private MatchResult processMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
-        // TODO::! notEnoughCredit() : 3
-        if (controls.canTrade(newOrder, trade) != MatchingOutcome.OK) {
-            rollbackTrades(newOrder, trades);
-            return MatchResult.notEnoughCredit();
-        }
-        // TODO::! decreaseBuyersCredit() 1-2
-        return null;
-    }
-
-//    private void updateOrderQuantities(Order newOrder, Order matchingOrder, OrderBook orderBook) {
-//        if (newOrder.getQuantity() < matchingOrder.getQuantity()) {
-//            matchingOrder.decreaseQuantity(newOrder.getQuantity());
-//            newOrder.makeQuantityZero();
-//            return;
-//        }
-//        newOrder.decreaseQuantity(matchingOrder.getQuantity());
-//        orderBook.removeFirst(matchingOrder.getSide());
-//        if (matchingOrder instanceof IcebergOrder icebergOrder) {
-//            icebergOrder.decreaseQuantity(matchingOrder.getQuantity());
-//            icebergOrder.replenish();
-//            if (icebergOrder.getQuantity() > 0) orderBook.enqueue(icebergOrder);
-//        }
-//    }
     public MatchResult match(Order newOrder) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
@@ -75,8 +50,11 @@ public class Matcher {
             Order matchingOrder = orderBook.matchWithFirst(newOrder);
             if (matchingOrder == null) break;
             Trade trade = createNewTradeFor(newOrder, matchingOrder.getPrice(), matchingOrder);
-            MatchResult tradeResult = processMatchedTrade(trade, newOrder, trades);
-            if (tradeResult != null) return tradeResult;
+
+            if (controls.canTrade(newOrder, trade) != MatchingOutcome.OK) {
+                controls.rollbackTrades(newOrder, trades);
+                return MatchResult.notEnoughCredit();
+            }
 
             trades.add(trade);
             controls.tradeAccepted(newOrder, trade);
@@ -180,7 +158,6 @@ public class Matcher {
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
-            // TODO::! decreaseCreditBy() : 5
             newOrder.getBroker().increaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
             trades.forEach(trade -> trade.getSell().getBroker().decreaseCreditBy(trade.getTradedValue()));
 
@@ -189,7 +166,6 @@ public class Matcher {
                 newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getSell());
             }
         } else if (newOrder.getSide() == Side.SELL) {
-            // TODO::! decreaseCreditBy() : 5
             newOrder.getBroker().decreaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
 
             ListIterator<Trade> it = trades.listIterator(trades.size());
@@ -221,13 +197,7 @@ public class Matcher {
         rollbackTrades(order, result.trades());
         return true;
     }
-    //TODO bah bah
-    private void updateShareholderPositions(List<Trade> trades) {
-        for (Trade trade : trades) {
-            trade.getBuy().getShareholder().incPosition(trade.getSecurity(), trade.getQuantity());
-            trade.getSell().getShareholder().decPosition(trade.getSecurity(), trade.getQuantity());
-        }
-    }
+
     public MatchResult execute(Order order) {
         int prevQuantity = order.getQuantity();
 
@@ -243,33 +213,29 @@ public class Matcher {
         MatchResult remainderResult = handleTradeRemainder(result, order);
         if (remainderResult != null) return remainderResult;
 
-        updateShareholderPositions(result.trades());
         if (!result.trades().isEmpty())
             lastTradePrice = result.trades().getLast().getPrice();
         return result;
     }
     private MatchResult handleTradeRemainder(MatchResult result, Order order) {
-        if (result.remainder().getQuantity() <= 0) return null;
-        // TODO::! notEnoughCredit() : 3
-        if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit((long)order.getPrice() * order.getQuantity())) {
-            rollbackTrades(order, result.trades());
-            return MatchResult.notEnoughCredit();
+        if (result.remainder().getQuantity() > 0){
+            if(controls.canAcceptMatching(order, result) != MatchingOutcome.OK){
+                controls.rollbackTrades(order, result.trades());
+                return MatchResult.notEnoughCredit();
+            }
+            order.getSecurity().getOrderBook().enqueue(result.remainder());
         }
 
-        // TODO::! decreaseCreditBy() : 5
-        if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
-
-        order.getSecurity().getOrderBook().enqueue(result.remainder());
+        controls.matchingAccepted(order, result);
         return null;
     }
 
     public MatchResult auctionExecute(Order order) {
-        // TODO::! notEnoughCredit() : 3
-        if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue())) {
+        if (controls.canTrade(order, null) != MatchingOutcome.OK) {
             return MatchResult.notEnoughCredit();
         }
 
-        // TODO::! decreaseCreditBy() : 5
+        // TODO::! age bara auction joda konim control ro mishe ino ok kard
         if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
 
         OrderBook orderBook = order.getSecurity().getOrderBook();

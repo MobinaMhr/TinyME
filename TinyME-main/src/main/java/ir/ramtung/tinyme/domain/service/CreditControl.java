@@ -44,7 +44,7 @@ public class CreditControl implements MatchingControl {
     @Override
     public void matchingAccepted(Order order, MatchResult result) {
         if (order.getSide() == Side.BUY) {
-            order.getBroker().decreaseCreditBy(order.getValue());
+            order.getBroker().decreaseCreditBy((long) order.getQuantity()*order.getPrice());
         }
     }
 
@@ -53,9 +53,18 @@ public class CreditControl implements MatchingControl {
         if (newOrder.getSide() == Side.BUY) {
             newOrder.getBroker().increaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
             trades.forEach(trade -> trade.getSell().getBroker().decreaseCreditBy(trade.getTradedValue()));
-        } else {
+
+            ListIterator<Trade> it = trades.listIterator(trades.size());
+            while (it.hasPrevious()) {
+                newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getSell());
+            }
+        } else if (newOrder.getSide() == Side.SELL) {
             newOrder.getBroker().decreaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
-            trades.forEach(trade -> trade.getSell().getBroker().increaseCreditBy(trade.getTradedValue()));
+
+            ListIterator<Trade> it = trades.listIterator(trades.size());
+            while (it.hasPrevious()) {
+                newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getBuy());
+            }
         }
     }
 }
