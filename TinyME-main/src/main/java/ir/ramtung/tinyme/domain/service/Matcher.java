@@ -23,7 +23,7 @@ public class Matcher {
     }
     private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
-        // TODO::! credit validation
+        // TODO::! notEnoughCredit() : 3
         if (newSLOrder.getSide() == Side.BUY && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
             return MatchResult.notEnoughCredit();
         }
@@ -35,10 +35,12 @@ public class Matcher {
     }
 
     private MatchResult validateMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
+        // TODO::! notEnoughCredit() : 3
         if (newOrder.getSide() == Side.BUY && !trade.buyerHasEnoughCredit()) {
             rollbackTrades(newOrder, trades);
             return MatchResult.notEnoughCredit();
         }
+        // TODO::! decreaseBuyersCredit() 1-2
         if (newOrder.getSide() == Side.BUY) trade.decreaseBuyersCredit();
 
         trade.increaseSellersCredit();
@@ -175,7 +177,7 @@ public class Matcher {
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
-            // TODO::!
+            // TODO::! decreaseCreditBy() : 5
             newOrder.getBroker().increaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
             trades.forEach(trade -> trade.getSell().getBroker().decreaseCreditBy(trade.getTradedValue()));
 
@@ -184,7 +186,7 @@ public class Matcher {
                 newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getSell());
             }
         } else if (newOrder.getSide() == Side.SELL) {
-            // TODO::!
+            // TODO::! decreaseCreditBy() : 5
             newOrder.getBroker().decreaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
 
             ListIterator<Trade> it = trades.listIterator(trades.size());
@@ -202,11 +204,8 @@ public class Matcher {
         return switch (result.outcome()) {
             case NOT_ENOUGH_CREDIT -> true;
             case NOT_MET_LAST_TRADE_PRICE -> {
-                if (order.getSide() == Side.BUY) {
-                    order.getBroker().decreaseCreditBy(
-                            (long) order.getPrice() * order.getQuantity()
-                    );
-                }
+                // TODO? decreaseCreditBy() : 5
+                if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy((long) order.getPrice() * order.getQuantity());
                 yield true;
             }
             default -> false;
@@ -248,28 +247,27 @@ public class Matcher {
     }
     private MatchResult handleTradeRemainder(MatchResult result, Order order) {
         if (result.remainder().getQuantity() <= 0) return null;
-        // TODO::!
+        // TODO::! notEnoughCredit() : 3
         if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit((long)order.getPrice() * order.getQuantity())) {
             rollbackTrades(order, result.trades());
             return MatchResult.notEnoughCredit();
         }
-        if (order.getSide() == Side.BUY) {
-            order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
-        }
+
+        // TODO::! decreaseCreditBy() : 5
+        if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
 
         order.getSecurity().getOrderBook().enqueue(result.remainder());
         return null;
     }
 
     public MatchResult auctionExecute(Order order) {
-        // TODO::! 
+        // TODO::! notEnoughCredit() : 3
         if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue())) {
             return MatchResult.notEnoughCredit();
         }
-        if (order.getSide() == Side.BUY) {
-            order.getBroker().decreaseCreditBy(order.getValue());
-        }
 
+        // TODO::! decreaseCreditBy() : 5
+        if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
 
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
