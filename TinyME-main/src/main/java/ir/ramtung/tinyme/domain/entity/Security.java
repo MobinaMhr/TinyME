@@ -1,10 +1,5 @@
 package ir.ramtung.tinyme.domain.entity;
 
-import ir.ramtung.tinyme.messaging.TradeDTO;
-import ir.ramtung.tinyme.messaging.event.Event;
-import ir.ramtung.tinyme.messaging.event.OrderActivateEvent;
-import ir.ramtung.tinyme.messaging.event.OrderExecutedEvent;
-import ir.ramtung.tinyme.messaging.event.OrderRejectedEvent;
 import ir.ramtung.tinyme.messaging.exception.InvalidRequestException;
 import ir.ramtung.tinyme.messaging.request.DeleteOrderRq;
 import ir.ramtung.tinyme.messaging.request.EnterOrderRq;
@@ -17,7 +12,6 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Getter
 @Builder

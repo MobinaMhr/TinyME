@@ -21,7 +21,7 @@ public class Matcher {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
-    public MatchResult matchSLO(StopLimitOrder newSLOrder) {
+    private MatchResult matchSLO(StopLimitOrder newSLOrder) {
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         if (newSLOrder.getSide() == Side.BUY
                 && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
@@ -33,8 +33,7 @@ public class Matcher {
         }
         return null;
     }
-    private MatchResult validateMatchedTrade(Trade trade, Order newOrder,
-                                             LinkedList<Trade> trades) {
+    private MatchResult validateMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
             if (!trade.buyerHasEnoughCredit()) {
                 rollbackTrades(newOrder, trades);

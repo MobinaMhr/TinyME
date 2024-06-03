@@ -27,6 +27,7 @@ public class OrderHandler {
     ShareholderRepository shareholderRepository;
     EventPublisher eventPublisher;
     Matcher matcher;
+    RequestValidator requestValidator;
     private  HashMap<Long, Long> orderIdRqIdMap;
 
     public OrderHandler(SecurityRepository securityRepository, BrokerRepository brokerRepository,
@@ -37,6 +38,7 @@ public class OrderHandler {
         this.eventPublisher = eventPublisher;
         this.matcher = matcher;
         this.orderIdRqIdMap = new HashMap<Long, Long>(); // TODO Convert to Object
+        this.requestValidator = new RequestValidator(securityRepository, brokerRepository, shareholderRepository);
     }
 
     // TODO move all of these to EventPublisher.
@@ -79,7 +81,7 @@ public class OrderHandler {
     }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
         try {
-            validateEnterOrderRq(enterOrderRq);
+            requestValidator.validateRequest(enterOrderRq);
             Security security = securityRepository.findSecurityByIsin(enterOrderRq.getSecurityIsin());
             Broker broker = brokerRepository.findBrokerById(enterOrderRq.getBrokerId());
             Shareholder shareholder = shareholderRepository.findShareholderById(enterOrderRq.getShareholderId());
@@ -105,7 +107,7 @@ public class OrderHandler {
     }
     public void handleChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) {
         try {
-            validateChangeMatchingStateRq(changeMatchingStateRq);
+            requestValidator.validateRequest(changeMatchingStateRq);
 
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
             MatchingState oldMatchingState = security.getCurrentMatchingState();
@@ -125,9 +127,24 @@ public class OrderHandler {
             eventPublisher.publishChangeMatchingStateRqRejectedEvent(changeMatchingStateRq);
         }
     }
-    public void executeActivatedSLO(Security security, MatchingState targetState){
+    public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {
+        try {
+            requestValidator.validateRequest(deleteOrderRq);
+
+            Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
+            security.deleteOrder(deleteOrderRq, matcher);
+            eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
+            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
+            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
+                eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
+            }
+        } catch (InvalidRequestException e) {
+            eventPublisher.publishOrderRejectedEvent(deleteOrderRq, e.getReasons());
+        }
+    }
+    // TODO -> Mahdi should move this in security with respect of  other groups
+    private void executeActivatedSLO(Security security, MatchingState targetState){
         ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
-        System.out.println(results);
         for (MatchResult result: results){
             switch (result.outcome()) {
                 case NOT_ENOUGH_CREDIT:
@@ -142,115 +159,6 @@ public class OrderHandler {
             if (!result.trades().isEmpty())
                 eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(result.remainder().getOrderId()),
                         result.remainder().getOrderId(), result);
-        }
-    }
-    public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {
-        try {
-            validateDeleteOrderRq(deleteOrderRq);
-
-            Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
-            security.deleteOrder(deleteOrderRq, matcher);
-            eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
-            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
-            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
-                eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
-            }
-        } catch (InvalidRequestException e) {
-            eventPublisher.publishOrderRejectedEvent(deleteOrderRq, e.getReasons());
-        }
-    }
-    private void validateEnterOrderAttributes(EnterOrderRq enterOrderRq, List<String> errors) {
-        if (enterOrderRq.getOrderId() <= 0)
-            errors.add(Message.INVALID_ORDER_ID);
-        if (enterOrderRq.getQuantity() <= 0)
-            errors.add(Message.ORDER_QUANTITY_NOT_POSITIVE);
-        if (enterOrderRq.getPrice() <= 0)
-            errors.add(Message.ORDER_PRICE_NOT_POSITIVE);
-        if (enterOrderRq.getMinimumExecutionQuantity() < 0)
-            errors.add(Message.MEQ_NOT_POSITIVE);
-        if (enterOrderRq.getMinimumExecutionQuantity() > enterOrderRq.getQuantity())
-            errors.add(Message.MEQ_CANNOT_BE_MORE_THAN_ORDER_QUANTITY);
-        if(enterOrderRq.getStopPrice() < 0)
-            errors.add(Message.STOP_PRICE_NOT_POSITIVE);
-        if(enterOrderRq.getStopPrice() > 0 && enterOrderRq.getMinimumExecutionQuantity() > 0)
-            errors.add(Message.ORDER_CANNOT_HAVE_MEQ_AND_BE_STOP_LIMIT);
-        if(enterOrderRq.getStopPrice() > 0 && enterOrderRq.getPeakSize() > 0)
-            errors.add(Message.ORDER_CANNOT_BE_ICEBERG_AND_STOP_LIMIT);
-    }
-    private void validateEnterOrderBroker(EnterOrderRq enterOrderRq, List<String> errors) {
-        if (brokerRepository.findBrokerById(enterOrderRq.getBrokerId()) == null)
-            errors.add(Message.UNKNOWN_BROKER_ID);
-    }
-    private void validateEnterOrderShareholder(EnterOrderRq enterOrderRq, List<String> errors) {
-        if (shareholderRepository.findShareholderById(enterOrderRq.getShareholderId()) == null)
-            errors.add(Message.UNKNOWN_SHAREHOLDER_ID);
-    }
-    private void validateEnterOrderPeakSize(EnterOrderRq enterOrderRq, List<String> errors) {
-        if (enterOrderRq.getPeakSize() < 0 || enterOrderRq.getPeakSize() >= enterOrderRq.getQuantity())
-            errors.add(Message.INVALID_PEAK_SIZE);
-    }
-    private void validateEnterOrderSecurity(EnterOrderRq enterOrderRq, List<String> errors) {
-        Security security = securityRepository.findSecurityByIsin(enterOrderRq.getSecurityIsin());
-        if (security == null)
-            errors.add(Message.UNKNOWN_SECURITY_ISIN);
-        else {
-            if (enterOrderRq.getQuantity() % security.getLotSize() != 0)
-                errors.add(Message.QUANTITY_NOT_MULTIPLE_OF_LOT_SIZE);
-            if (enterOrderRq.getPrice() % security.getTickSize() != 0)
-                errors.add(Message.PRICE_NOT_MULTIPLE_OF_TICK_SIZE);
-        }
-    }
-    private void validateEnterOrderRq(EnterOrderRq enterOrderRq) throws InvalidRequestException {
-        List<String> errors = new LinkedList<>();
-
-        validateEnterOrderAttributes(enterOrderRq, errors);
-        validateEnterOrderSecurity(enterOrderRq, errors);
-        validateEnterOrderBroker(enterOrderRq, errors);
-        validateEnterOrderShareholder(enterOrderRq, errors);
-        validateEnterOrderPeakSize(enterOrderRq, errors);
-
-        if (!errors.isEmpty()) {
-            throw new InvalidRequestException(errors);
-        }
-    }
-
-    private void validateChangeMatchingStateRqSecurity(ChangeMatchingStateRq changeMatchingStateRq,
-                                                       List<String> errors) {
-        Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
-        if (security == null)
-            errors.add(Message.UNKNOWN_SECURITY_ISIN);
-        if(changeMatchingStateRq.getTargetState() != MatchingState.AUCTION &&
-                changeMatchingStateRq.getTargetState() != MatchingState.CONTINUOUS)
-            errors.add(Message.INVALID_TARGET_MATCHING_STATE);
-    }
-    private void validateChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq)
-            throws InvalidRequestException {
-        List<String> errors = new LinkedList<>();
-
-        validateChangeMatchingStateRqSecurity(changeMatchingStateRq, errors);
-
-        if (!errors.isEmpty()) {
-            throw new InvalidRequestException(errors);
-        }
-    }
-
-    private void validateDeleteOrderAttributes(DeleteOrderRq deleteOrderRq, List<String> errors) {
-        if (deleteOrderRq.getOrderId() <= 0)
-            errors.add(Message.INVALID_ORDER_ID);
-    }
-    private void validateDeleteOrderRqSecurity(DeleteOrderRq deleteOrderRq, List<String> errors) {
-        Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
-        if (security == null)
-            errors.add(Message.UNKNOWN_SECURITY_ISIN);
-    }
-    private void validateDeleteOrderRq(DeleteOrderRq deleteOrderRq) throws InvalidRequestException {
-        List<String> errors = new LinkedList<>();
-
-        validateDeleteOrderAttributes(deleteOrderRq, errors);
-        validateDeleteOrderRqSecurity(deleteOrderRq, errors);
-
-        if (!errors.isEmpty()) {
-            throw new InvalidRequestException(errors);
         }
     }
 }
