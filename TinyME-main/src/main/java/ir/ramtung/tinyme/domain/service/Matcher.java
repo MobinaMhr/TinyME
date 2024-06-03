@@ -21,7 +21,7 @@ public class Matcher {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
-    private MatchResult matchSLO(StopLimitOrder newSLOrder) {
+    private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         if (newSLOrder.getSide() == Side.BUY
                 && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
@@ -79,7 +79,7 @@ public class Matcher {
         return MatchResult.executed(newOrder, trades);
     }
 
-    private int checkOppQueue(int orgPrice, LinkedList<Order> oppQueue, Side orgSide){
+    private int checkOppQueue(int orgPrice, LinkedList<Order> oppQueue, Side orgSide) { //TODO::Rename
         int tradableQuantityOpp = 0;
         for(Order order:oppQueue) {
             if (orgSide == Side.BUY && order.getPrice() > orgPrice) break;
@@ -89,7 +89,8 @@ public class Matcher {
         return tradableQuantityOpp;
     }
 
-    private void calculateBestReopeningPriceInQueue(LinkedList<Order> queue, OrderBook orderBook, Side side){
+    private void calculateBestReopeningPriceInQueue(LinkedList<Order> queue, OrderBook orderBook, Side side) {
+        //TODO:rename to getter function and set the return type as in
         int tradableQuantity = 0;
         int tradableQuantityOpp;
 
@@ -193,7 +194,7 @@ public class Matcher {
     private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){
         return (initialQuantity - remainder.getQuantity()) >= remainder.getMinimumExecutionQuantity();
     }
-    private boolean checkForMatchOutcome(MatchResult result, Order order) {
+    private boolean checkForMatchOutcome(MatchResult result, Order order) { // TODO::rename based on return type
         return switch (result.outcome()) {
             case NOT_ENOUGH_CREDIT -> true;
             case NOT_MET_LAST_TRADE_PRICE -> {
@@ -254,9 +255,13 @@ public class Matcher {
         order.getSecurity().getOrderBook().enqueue(result.remainder());
         return null;
     }
+
+//    public boolean hasEnoughCredit(long amount) {
+//        return credit >= amount;
+//    }
     public MatchResult auctionExecute(Order order) {
         if (order.getSide() == Side.BUY) {
-            if (order.getBroker().getCredit() < order.getValue())
+            if (!order.getBroker().hasEnoughCredit(order.getValue()))
                 return MatchResult.notEnoughCredit();
             order.getBroker().decreaseCreditBy(order.getValue());
         }
