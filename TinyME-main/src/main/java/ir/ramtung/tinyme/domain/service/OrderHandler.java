@@ -41,9 +41,35 @@ public class OrderHandler {
         this.requestValidator = new RequestValidator(securityRepository, brokerRepository, shareholderRepository);
     }
 
-    // TODO move all of these to EventPublisher.
 
-    public void resultPublisher(MatchResult matchResult, EnterOrderRq enterOrderRq,
+    // TODO -> Mahdi should move this in security with respect of  other groups
+    private void executeActivatedSLO(Security security, MatchingState targetState){
+        ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
+        for (MatchResult result: results){
+            switch (result.outcome()) {
+                case NOT_ENOUGH_CREDIT:
+                    eventPublisher.publishOrderRejectedEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                            result.remainder().getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT));
+                    break;
+                case ACTIVATED:
+                    eventPublisher.publishOrderActivateEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                            result.remainder().getOrderId());
+                    break;
+            }
+            if (!result.trades().isEmpty())
+                eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(result.remainder().getOrderId()),
+                        result.remainder().getOrderId(), result);
+        }
+    }
+    private boolean shouldInactiveOrdersActivate(MatchResult matchResult) {
+        if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED ||
+                matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION)
+            return true;
+        return false;
+    }
+
+
+    public void publishEnterOrderRq(EnterOrderRq enterOrderRq, MatchResult matchResult,
                                    boolean isTypeStopLimitOrder, Security security) {
         switch (matchResult.outcome()) {
             case EXECUTED:
@@ -77,12 +103,6 @@ public class OrderHandler {
         if (!matchResult.trades().isEmpty())
             eventPublisher.publishIfTradeExists(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult);
     }
-    private boolean shouldInactiveOrdersActivate(MatchResult matchResult) {
-        if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED ||
-                matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION)
-            return true;
-        return false;
-    }
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
         try {
             requestValidator.validateRequest(enterOrderRq);
@@ -100,13 +120,22 @@ public class OrderHandler {
                         .findByOrderId(enterOrderRq.getSide(),enterOrderRq.getOrderId()) != null;
                 matchResult = security.updateOrder(enterOrderRq, matcher);
             }
-            resultPublisher(matchResult, enterOrderRq, isTypeStopLimitOrder, security);
+            publishEnterOrderRq(enterOrderRq, matchResult, isTypeStopLimitOrder, security);
             if(shouldInactiveOrdersActivate(matchResult)) {
                 executeActivatedSLO(security, null);
             }
         } catch (InvalidRequestException e) {
             eventPublisher.publishOrderRejectedEvent(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), e.getReasons());
         }
+    }
+
+    private void publishChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq, MatchResult result, Security security) {
+        eventPublisher.publishSecurityStateChangedEvent(changeMatchingStateRq);
+
+        // Shall we change ? TODO
+        if (result == null || result.trades() == null) return;
+        for (Trade trade : result.trades())
+            eventPublisher.publishTradeEvents(trade, security.getIsin());
     }
     public void handleChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq) {
         try {
@@ -115,12 +144,14 @@ public class OrderHandler {
             Security security = securityRepository.findSecurityByIsin(changeMatchingStateRq.getSecurityIsin());
             MatchingState oldMatchingState = security.getCurrentMatchingState();
             MatchResult result = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
-            eventPublisher.publishSecurityStateChangedEvent(changeMatchingStateRq);
 
-            // Shall we change ? TODO
-            if (result == null || result.trades() == null) return;
-            for (Trade trade : result.trades())
-                eventPublisher.publishTradeEvents(trade, security.getIsin());
+            publishChangeMatchingStateRq(changeMatchingStateRq, result, security);
+            //            eventPublisher.publishSecurityStateChangedEvent(changeMatchingStateRq);
+//
+//            // Shall we change ? TODO
+//            if (result == null || result.trades() == null) return;
+//            for (Trade trade : result.trades())
+//                eventPublisher.publishTradeEvents(trade, security.getIsin());
 
             // TODO Should we move this if before previous if?
             if(oldMatchingState == MatchingState.AUCTION) {
@@ -130,38 +161,31 @@ public class OrderHandler {
             eventPublisher.publishChangeMatchingStateRqRejectedEvent(changeMatchingStateRq);
         }
     }
+
+    private void publishDeleteOrderRq(DeleteOrderRq deleteOrderRq, Security security) {
+        eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
+        orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
+
+        if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
+            eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
+        }
+    }
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {
         try {
             requestValidator.validateRequest(deleteOrderRq);
 
             Security security = securityRepository.findSecurityByIsin(deleteOrderRq.getSecurityIsin());
             security.deleteOrder(deleteOrderRq, matcher);
-            eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
-            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
-            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
-                eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
-            }
+
+            publishDeleteOrderRq(deleteOrderRq, security);
+//            eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
+//            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
+//
+//            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
+//                eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
+//            }
         } catch (InvalidRequestException e) {
             eventPublisher.publishOrderRejectedEvent(deleteOrderRq, e.getReasons());
-        }
-    }
-    // TODO -> Mahdi should move this in security with respect of  other groups
-    private void executeActivatedSLO(Security security, MatchingState targetState){
-        ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
-        for (MatchResult result: results){
-            switch (result.outcome()) {
-                case NOT_ENOUGH_CREDIT:
-                    eventPublisher.publishOrderRejectedEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
-                            result.remainder().getOrderId(), List.of(Message.BUYER_HAS_NOT_ENOUGH_CREDIT));
-                    break;
-                case ACTIVATED:
-                    eventPublisher.publishOrderActivateEvent(orderIdRqIdMap.get(result.remainder().getOrderId()),
-                            result.remainder().getOrderId());
-                    break;
-            }
-            if (!result.trades().isEmpty())
-                eventPublisher.publishIfTradeExists(orderIdRqIdMap.get(result.remainder().getOrderId()),
-                        result.remainder().getOrderId(), result);
         }
     }
 }
