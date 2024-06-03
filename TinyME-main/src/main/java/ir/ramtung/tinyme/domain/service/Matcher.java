@@ -23,9 +23,8 @@ public class Matcher {
     }
     private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
-        //TODO credit validation
-        if (newSLOrder.getSide() == Side.BUY
-                && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
+        // TODO::! credit validation
+        if (newSLOrder.getSide() == Side.BUY && !newSLOrder.getBroker().hasEnoughCredit(newSLOrder.getPrice())) {
             return MatchResult.notEnoughCredit();
         }
         if (!newSLOrder.canMeetLastTradePrice(lastTradePrice)) {
@@ -34,20 +33,19 @@ public class Matcher {
         }
         return null;
     }
-    //TODO change molaeee
+
     private MatchResult validateMatchedTrade(Trade trade, Order newOrder, LinkedList<Trade> trades) {
-        if (newOrder.getSide() == Side.BUY) {
-            if (!trade.buyerHasEnoughCredit()) {
-                rollbackTrades(newOrder, trades);
-                return MatchResult.notEnoughCredit();
-            }
-            trade.decreaseBuyersCredit();
+        if (newOrder.getSide() == Side.BUY && !trade.buyerHasEnoughCredit()) {
+            rollbackTrades(newOrder, trades);
+            return MatchResult.notEnoughCredit();
         }
+        if (newOrder.getSide() == Side.BUY) trade.decreaseBuyersCredit();
+
         trade.increaseSellersCredit();
         trades.add(trade);
         return null;
     }
-    //TODO change molaeee
+
     private void updateOrderQuantities(Order newOrder, Order matchingOrder, OrderBook orderBook) {
         if (newOrder.getQuantity() < matchingOrder.getQuantity()) {
             matchingOrder.decreaseQuantity(newOrder.getQuantity());
@@ -157,19 +155,19 @@ public class Matcher {
             Order sellOrder = sellOrders.getFirst();
 
             Trade trade = createNewTradeFor(buyOrder, this.reopeningPrice, sellOrder);
-            //TODO injaro niga
+
             buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
             trade.decreaseBuyersCredit();
             trade.increaseSellersCredit();
             trades.add(trade);
-            //TODO injaro niga
+
             int tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
             buyOrder.decreaseQuantity(tradedQuantity);
             sellOrder.decreaseQuantity(tradedQuantity);
-            //TODO injaro niga
+
             removeOrdersWithZeroQuantity(buyOrder, Side.BUY, orderBook);
             removeOrdersWithZeroQuantity(sellOrder, Side.SELL, orderBook);
-            //TODO wtf!!!!!!!!
+
             buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
         return trades;
@@ -177,7 +175,7 @@ public class Matcher {
 
     private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
         if (newOrder.getSide() == Side.BUY) {
-            //TODO salam
+            // TODO::!
             newOrder.getBroker().increaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
             trades.forEach(trade -> trade.getSell().getBroker().decreaseCreditBy(trade.getTradedValue()));
 
@@ -186,7 +184,7 @@ public class Matcher {
                 newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getSell());
             }
         } else if (newOrder.getSide() == Side.SELL) {
-            //TODO salam again
+            // TODO::!
             newOrder.getBroker().decreaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
 
             ListIterator<Trade> it = trades.listIterator(trades.size());
@@ -250,12 +248,12 @@ public class Matcher {
     }
     private MatchResult handleTradeRemainder(MatchResult result, Order order) {
         if (result.remainder().getQuantity() <= 0) return null;
-        //TODO injaro niga
+        // TODO::!
+        if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit((long)order.getPrice() * order.getQuantity())) {
+            rollbackTrades(order, result.trades());
+            return MatchResult.notEnoughCredit();
+        }
         if (order.getSide() == Side.BUY) {
-            if (!order.getBroker().hasEnoughCredit((long)order.getPrice() * order.getQuantity())) {
-                rollbackTrades(order, result.trades());
-                return MatchResult.notEnoughCredit();
-            }
             order.getBroker().decreaseCreditBy((long)order.getPrice() * order.getQuantity());
         }
 
@@ -264,12 +262,14 @@ public class Matcher {
     }
 
     public MatchResult auctionExecute(Order order) {
-        //TODO injaro niga
+        // TODO::! 
+        if (order.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue())) {
+            return MatchResult.notEnoughCredit();
+        }
         if (order.getSide() == Side.BUY) {
-            if (!order.getBroker().hasEnoughCredit(order.getValue()))
-                return MatchResult.notEnoughCredit();
             order.getBroker().decreaseCreditBy(order.getValue());
         }
+
 
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
