@@ -178,69 +178,47 @@ public class Matcher {
     private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){
         return (initialQuantity - remainder.getQuantity()) >= remainder.getMinimumExecutionQuantity();
     }
-    //TODO in chie mobinaaaaaaaaaaaaaaaaa???
-    private boolean checkForMatchOutcome(MatchResult result, Order order) { // TODO::rename based on return type
-        return switch (result.outcome()) {
-            case NOT_ENOUGH_CREDIT -> true;
-            case NOT_MET_LAST_TRADE_PRICE -> {
-                // TODO? decreaseCreditBy() : 5
-                if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy((long) order.getPrice() * order.getQuantity());
-                yield true;
-            }
-            default -> false;
-        };
-    }
-    private boolean checkNewOrderNotMetMEQ(MatchResult result, Order order, int prevQuantity) {
-        if (!(order.getStatus() == OrderStatus.NEW)) return false;
-        if (isMEQFilterPassedBy(result.remainder(), prevQuantity)) return false;
-
-        rollbackTrades(order, result.trades());
-        return true;
-    }
 
     public MatchResult execute(Order order) {
         int prevQuantity = order.getQuantity();
 
         MatchResult result = match(order);
-        if (checkForMatchOutcome(result, order)) return result;
-        if (checkNewOrderNotMetMEQ(result, order, prevQuantity)) return MatchResult.notMetMEQValue();
+        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) return result;
+
+        if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
+            if (order.getSide() == Side.BUY)
+                order.getBroker().decreaseCreditBy((long) order.getPrice() * order.getQuantity());
+            return result;
+        }
 
         if (order.getStatus() == OrderStatus.NEW && !isMEQFilterPassedBy(result.remainder(), prevQuantity)){
             rollbackTrades(order, result.trades());
             return MatchResult.notMetMEQValue();
         }
 
-        MatchResult remainderResult = handleTradeRemainder(result, order);
-        if (remainderResult != null) return remainderResult;
-
-        if (!result.trades().isEmpty())
-            lastTradePrice = result.trades().getLast().getPrice();
-        return result;
-    }
-    private MatchResult handleTradeRemainder(MatchResult result, Order order) {
-        if (result.remainder().getQuantity() > 0){
-            if(controls.canAcceptMatching(order, result) != MatchingOutcome.OK){
-                controls.rollbackTrades(order, result.trades());
-                return MatchResult.notEnoughCredit();
-            }
-            order.getSecurity().getOrderBook().enqueue(result.remainder());
-        }
-
-        controls.matchingAccepted(order, result);
-        return null;
-    }
-
-    public MatchResult auctionExecute(Order order) {
-        if (controls.canTrade(order, null) != MatchingOutcome.OK) {
+        if(controls.canAcceptMatching(order, result) != MatchingOutcome.OK){
+            controls.rollbackTrades(order, result.trades());
             return MatchResult.notEnoughCredit();
         }
 
-        // TODO::! age bara auction joda konim control ro mishe ino ok kard
+        if (result.remainder().getQuantity() > 0) order.getSecurity().getOrderBook().enqueue(result.remainder());
+        controls.matchingAccepted(order, result);
+        if (!result.trades().isEmpty()) lastTradePrice = result.trades().getLast().getPrice();
+
+        return result;
+    }
+
+    public MatchResult auctionExecute(Order order) {
+        if (controls.canTrade(order, null) != MatchingOutcome.OK)
+            return MatchResult.notEnoughCredit();
+
+//        matchingAccepted add value to  input list and rename to matchingConditionsAccepted?
         if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
 
         OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
         calculateReopeningPrice(orderBook);
+
         return MatchResult.executed();
     }
 }
