@@ -105,20 +105,11 @@ public class Order {
         }
     }
 
-    // Why we don't have this
-//    public boolean minimumExecutionQuantitySatisfied() {
-//        if (initialQuantity - quantity < minimumExecutionQuantity)
-//            return false;
-//        return true;
-//    }
+    // TODO we can add initialQuantity as and attribute to this class.
+    public boolean minimumExecutionQuantitySatisfied(int initialQuantity) {
+        return initialQuantity - quantity >= minimumExecutionQuantity;
+    }
 
-//    public void markAsQueued() {
-//        status = OrderStatus.QUEUED;
-//    }
-//
-//    public void markAsNew() {
-//        status = OrderStatus.NEW;
-//    }
     public void queue() {
         status = OrderStatus.QUEUED;
     }

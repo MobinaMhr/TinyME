@@ -175,10 +175,6 @@ public class Matcher {
         }
     }
 
-    private boolean isMEQFilterPassedBy(Order remainder, int initialQuantity){
-        return (initialQuantity - remainder.getQuantity()) >= remainder.getMinimumExecutionQuantity();
-    }
-
     public MatchResult execute(Order order) {
         int prevQuantity = order.getQuantity();
 
@@ -191,7 +187,8 @@ public class Matcher {
             return result;
         }
 
-        if (order.getStatus() == OrderStatus.NEW && !isMEQFilterPassedBy(result.remainder(), prevQuantity)){
+        if (order.getStatus() == OrderStatus.NEW &&
+                !result.remainder().minimumExecutionQuantitySatisfied(prevQuantity)) {
             rollbackTrades(order, result.trades());
             return MatchResult.notMetMEQValue();
         }
