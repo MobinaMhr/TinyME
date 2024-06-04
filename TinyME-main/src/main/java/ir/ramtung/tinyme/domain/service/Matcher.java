@@ -63,7 +63,7 @@ public class Matcher {
         return MatchResult.executed(newOrder, trades);
     }
 
-    private int checkOppQueue(int orgPrice, LinkedList<Order> oppQueue, Side orgSide) { //TODO::Rename
+    private int getTradableQuantity(int orgPrice, LinkedList<Order> oppQueue, Side orgSide) {
         int tradableQuantityOpp = 0;
         for(Order order:oppQueue) {
             if (orgSide == Side.BUY && order.getPrice() > orgPrice) break;
@@ -82,8 +82,8 @@ public class Matcher {
             tradableQuantity += order.getTotalQuantity();
 
             tradableQuantityOpp = (side == Side.SELL) ?
-                    checkOppQueue(order.getPrice(), orderBook.getBuyQueue(), side) :
-                    checkOppQueue(order.getPrice(), orderBook.getSellQueue(), side);
+                    getTradableQuantity(order.getPrice(), orderBook.getBuyQueue(), side) :
+                    getTradableQuantity(order.getPrice(), orderBook.getSellQueue(), side);
 
             int exchangedQuantity = Math.min(tradableQuantityOpp, tradableQuantity);
             if(exchangedQuantity > this.maxTradableQuantity){
@@ -108,8 +108,8 @@ public class Matcher {
         calculateBestReopeningPriceInQueue(orderBook.getBuyQueue(), orderBook, Side.BUY);
         calculateBestReopeningPriceInQueue(orderBook.getSellQueue(), orderBook, Side.SELL);
 
-        int maxQuantityWithLastPrice = Math.min(checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.BUY),
-                checkOppQueue(lastTradePrice, orderBook.getBuyQueue(), Side.SELL));
+        int maxQuantityWithLastPrice = Math.min(getTradableQuantity(lastTradePrice, orderBook.getBuyQueue(), Side.BUY),
+                getTradableQuantity(lastTradePrice, orderBook.getBuyQueue(), Side.SELL));
 
         if (maxQuantityWithLastPrice == this.maxTradableQuantity) this.reopeningPrice = lastTradePrice;
         if (maxTradableQuantity == 0) this.reopeningPrice = 0;
