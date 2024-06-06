@@ -80,15 +80,17 @@ public class Security {
         return order;
     }
 
+    private void removeFromOrderBook(DeleteOrderRq deleteOrderRq) {
+        orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+        inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
+    }
+
     public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = findOrder(deleteOrderRq.getSide(), deleteOrderRq.getOrderId(),
                 Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         // TODO::! increaseCreditBy() : 2
         if (order.getSide() == Side.BUY) order.getBroker().increaseCreditBy(order.getValue());
-
-        orderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-        inactiveOrderBook.removeByOrderId(deleteOrderRq.getSide(), deleteOrderRq.getOrderId());
-
+        removeFromOrderBook(deleteOrderRq);
         if (currentMatchingState == MatchingState.AUCTION) matcher.calculateReopeningPrice(orderBook);
     }
 
