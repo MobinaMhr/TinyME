@@ -37,12 +37,11 @@ public class OrderHandler {
         this.shareholderRepository = shareholderRepository;
         this.eventPublisher = eventPublisher;
         this.matcher = matcher;
-        this.orderIdRqIdMap = new HashMap<Long, Long>(); // TODO Convert to Object
+        this.orderIdRqIdMap = new HashMap<Long, Long>();
         this.requestValidator = new RequestValidator(securityRepository, brokerRepository, shareholderRepository);
     }
 
 
-    // TODO -> Mahdi should move this in security with respect of  other groups
     private void executeActivatedSLO(Security security, MatchingState targetState){
         ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
         for (MatchResult result: results){

@@ -54,7 +54,6 @@ public class EventPublisher {
     public void publishOpeningPriceEvent(String isin, int reopeningPrice, int maxTradableQuantity) {
         this.publish(new OpeningPriceEvent(isin, reopeningPrice, maxTradableQuantity));
     }
-    // TODO: remove 2 of 3 or create new super class for requests
     public void publishOrderRejectedEvent(DeleteOrderRq deleteOrderRq, List<String> msgList) {
         this.publish(new OrderRejectedEvent(deleteOrderRq.getRequestId(), deleteOrderRq.getOrderId(), msgList));
     }

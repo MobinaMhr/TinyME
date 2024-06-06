@@ -21,12 +21,11 @@ public class Matcher {
     @Autowired
     public MatchingControlList controls;
 
-
     private Trade createNewTradeFor(Order order, int price, Order matchingOrder) {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
-    private MatchResult matchSLO(StopLimitOrder newSLOrder) { // TODO::rename to validateMatchSLO
+    private MatchResult canStartMatchingStopLimitOrder(StopLimitOrder newSLOrder) {
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         if (controls.canTrade(newSLOrder, null) != MatchingOutcome.OK) {
             return MatchResult.notEnoughCredit();
@@ -41,7 +40,7 @@ public class Matcher {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
         if (newOrder instanceof StopLimitOrder stopLimitOrder) {
-            MatchResult sloResult = matchSLO(stopLimitOrder);
+            MatchResult sloResult = canStartMatchingStopLimitOrder(stopLimitOrder);
             if (sloResult != null) return sloResult;
         }
 
@@ -58,7 +57,7 @@ public class Matcher {
 
             trades.add(trade);
             controls.tradeAccepted(newOrder, trade);
-            controls.tradeAccepted2(newOrder, matchingOrder, trade);
+            controls.tradeQuantityUpdated(newOrder, matchingOrder, trade);
         }
         return MatchResult.executed(newOrder, trades);
     }
@@ -140,11 +139,12 @@ public class Matcher {
             Trade trade = createNewTradeFor(buyOrder, this.reopeningPrice, sellOrder);
 
             buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
-            trade.decreaseBuyersCredit();
-            trade.increaseSellersCredit();
+            controls.tradeAccepted(buyOrder, trade);
+            controls.matchingAccepted(buyOrder, MatchResult.executed(List.of(trade))); //TODO in dorost mikone benazaram share haro
             trades.add(trade);
 
             int tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
+            //TODO in bayad tradeQuantityUpdated ro baraye halate auction ham besazim
             buyOrder.decreaseQuantity(tradedQuantity);
             sellOrder.decreaseQuantity(tradedQuantity);
 
@@ -154,25 +154,6 @@ public class Matcher {
             buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
         return trades;
-    }
-
-    private void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
-        if (newOrder.getSide() == Side.BUY) {
-            newOrder.getBroker().increaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
-            trades.forEach(trade -> trade.getSell().getBroker().decreaseCreditBy(trade.getTradedValue()));
-
-            ListIterator<Trade> it = trades.listIterator(trades.size());
-            while (it.hasPrevious()) {
-                newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getSell());
-            }
-        } else if (newOrder.getSide() == Side.SELL) {
-            newOrder.getBroker().decreaseCreditBy(trades.stream().mapToLong(Trade::getTradedValue).sum());
-
-            ListIterator<Trade> it = trades.listIterator(trades.size());
-            while (it.hasPrevious()) {
-                newOrder.getSecurity().getOrderBook().restoreOrder(it.previous().getBuy());
-            }
-        }
     }
 
     public MatchResult execute(Order order) {
@@ -190,14 +171,13 @@ public class Matcher {
         if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) return result;
 
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
-            if (order.getSide() == Side.BUY)
-                order.getBroker().decreaseCreditBy((long) order.getPrice() * order.getQuantity());
+            controls.orderAccepted(order);
             return result;
         }
 
         if (order.getStatus() == OrderStatus.NEW &&
                 !result.remainder().minimumExecutionQuantitySatisfied(prevQuantity)) {
-            rollbackTrades(order, result.trades());
+            controls.rollbackTrades(order, result.trades());
             return MatchResult.notMetMEQValue();
         }
 
@@ -207,6 +187,7 @@ public class Matcher {
         }
 
         if (result.remainder().getQuantity() > 0) order.getSecurity().getOrderBook().enqueue(result.remainder());
+        controls.orderAccepted(order);
         controls.matchingAccepted(order, result);
         if (!result.trades().isEmpty()) lastTradePrice = result.trades().getLast().getPrice();
 
@@ -223,8 +204,7 @@ public class Matcher {
         outcome = controls.canTrade(order, null);
         if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughCredit();
 
-//        matchingAccepted add value to  input list and rename to matchingConditionsAccepted?
-        if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
+        controls.orderAccepted(order);
 
         orderBook.enqueue(order);
         calculateReopeningPrice(orderBook);

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class QuantityControl implements MatchingControl {
     @Override
-    public void tradeAccepted2(Order newOrder, Order matchingOrder, Trade trade) {
+    public void tradeQuantityUpdated(Order newOrder, Order matchingOrder, Trade trade) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
         if (newOrder.getQuantity() < matchingOrder.getQuantity()) {

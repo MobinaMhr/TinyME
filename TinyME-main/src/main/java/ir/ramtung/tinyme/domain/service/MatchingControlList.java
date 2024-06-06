@@ -43,6 +43,12 @@ public class MatchingControlList {
         }
     }
 
+    public void orderAccepted(Order order) {
+        for (MatchingControl control : controlList) {
+            control.orderAccepted(order);
+        }
+    }
+
     public MatchingOutcome canTrade(Order newOrder, Trade trade) {
         for (MatchingControl control : controlList) {
             MatchingOutcome outcome = control.canTrade(newOrder, trade);
@@ -58,9 +64,9 @@ public class MatchingControlList {
             control.tradeAccepted(newOrder, trade);
         }
     }
-    public void tradeAccepted2(Order newOrder, Order matchingOrder, Trade trade) {
+    public void tradeQuantityUpdated(Order newOrder, Order matchingOrder, Trade trade) {
         for (MatchingControl control : controlList) {
-            control.tradeAccepted2(newOrder, matchingOrder, trade);
+            control.tradeQuantityUpdated(newOrder, matchingOrder, trade);
         }
     }
     public void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {

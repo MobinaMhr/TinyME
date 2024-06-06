@@ -12,11 +12,12 @@ public interface MatchingControl {
     default void matchingStarted(Order order) {}
     default MatchingOutcome canAcceptMatching(Order order, MatchResult result) { return MatchingOutcome.OK; }
     default void matchingAccepted(Order order, MatchResult result) {}
+    default void orderAccepted(Order order) {}
 
     default MatchingOutcome canTrade(Order newOrder, Trade trade) { return MatchingOutcome.OK; }
     default void tradeAccepted(Order newOrder, Trade trade) {}
 
-    default void tradeAccepted2(Order newOrder, Order matchingOrder , Trade trade) {}
+    default void tradeQuantityUpdated(Order newOrder, Order matchingOrder , Trade trade) {}
 
     default void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {}
 }

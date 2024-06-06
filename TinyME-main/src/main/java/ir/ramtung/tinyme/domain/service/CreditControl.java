@@ -42,7 +42,7 @@ public class CreditControl implements MatchingControl {
     }
 
     @Override
-    public void matchingAccepted(Order order, MatchResult result) {
+    public void orderAccepted(Order order) {
         if (order.getSide() == Side.BUY) {
             order.getBroker().decreaseCreditBy((long) order.getQuantity()*order.getPrice());
         }
