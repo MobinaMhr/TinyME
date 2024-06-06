@@ -51,14 +51,8 @@ public class Security {
     }
 
     public MatchResult newOrder(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder, Matcher matcher) {
-        // Check enough position on
-        int position = orderBook.totalSellQuantityByShareholder(shareholder) + enterOrderRq.getQuantity();
-        // TODO::! notEnoughPositions() : 2
-        if (enterOrderRq.getSide() == Side.SELL && !shareholder.hasEnoughPositionsOn(this, position)) {
-            return MatchResult.notEnoughPositions();
-        }
-
         Order order = createNewOrderInstance(enterOrderRq, broker, shareholder);
+
         if (currentMatchingState == MatchingState.CONTINUOUS) {
             return matcher.execute(order);
         }

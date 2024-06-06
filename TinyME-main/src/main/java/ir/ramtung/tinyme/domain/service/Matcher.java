@@ -176,6 +176,14 @@ public class Matcher {
     }
 
     public MatchResult execute(Order order) {
+        OrderBook orderBook = order.getSecurity().getOrderBook();
+
+        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder()) + order.getQuantity();
+        if (order.getSide() == Side.SELL
+                && !order.getShareholder().hasEnoughPositionsOn(order.getSecurity(), position)) {
+            return MatchResult.notEnoughPositions();
+        }
+
         int prevQuantity = order.getQuantity();
 
         MatchResult result = match(order);
@@ -206,13 +214,20 @@ public class Matcher {
     }
 
     public MatchResult auctionExecute(Order order) {
+        OrderBook orderBook = order.getSecurity().getOrderBook();
+
+        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder()) + order.getQuantity();
+        if (order.getSide() == Side.SELL
+                && !order.getShareholder().hasEnoughPositionsOn(order.getSecurity(), position)) {
+            return MatchResult.notEnoughPositions();
+        }
+
         if (controls.canTrade(order, null) != MatchingOutcome.OK)
             return MatchResult.notEnoughCredit();
 
 //        matchingAccepted add value to  input list and rename to matchingConditionsAccepted?
         if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
 
-        OrderBook orderBook = order.getSecurity().getOrderBook();
         orderBook.enqueue(order);
         calculateReopeningPrice(orderBook);
 
