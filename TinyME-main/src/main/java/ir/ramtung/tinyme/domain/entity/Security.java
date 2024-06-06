@@ -189,8 +189,9 @@ public class Security {
         ArrayList<MatchResult> results = new ArrayList<>();
         while ((activatedOrder = (this.getActivateCandidateOrder(matcher.getLastTradePrice()))) != null) {
             results.add(MatchResult.activated(activatedOrder));
+
             MatchResult matchResult = executeInMatcher(targetState, matcher, activatedOrder);
-            if (targetState == MatchingState.CONTINUOUS)
+            if(targetState != MatchingState.AUCTION)
                 results.add(matchResult);
         }
         return results;
