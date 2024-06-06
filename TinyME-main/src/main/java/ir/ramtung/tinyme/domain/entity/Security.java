@@ -30,7 +30,7 @@ public class Security {
     @Builder.Default
     private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
-
+    //TODO -> change flow of updateOrder if requiered time become available
 
     private Order createNewOrderInstance(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder) {
         if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0) {
@@ -88,7 +88,6 @@ public class Security {
     public void deleteOrder(DeleteOrderRq deleteOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = findOrder(deleteOrderRq.getSide(), deleteOrderRq.getOrderId(),
                 Message.CANNOT_DELETE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
-        // TODO::! increaseCreditBy() : 2
         if (order.getSide() == Side.BUY) order.getBroker().increaseCreditBy(order.getValue());
         removeFromOrderBook(deleteOrderRq.getOrderId(), deleteOrderRq.getSide());
         if (currentMatchingState == MatchingState.AUCTION) matcher.calculateReopeningPrice(orderBook);
@@ -116,7 +115,7 @@ public class Security {
         return (quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged);
     }
 
-    private MatchResult updateOrderWithSamePriority(Order order, Side orderSide, Matcher matcher) {
+    private MatchResult updateOrderWithSamePriorityAccepted(Order order, Side orderSide, Matcher matcher) {
         if (orderSide == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue()))
             return MatchResult.notEnoughCredit();
         if (orderSide == Side.BUY)
@@ -149,8 +148,7 @@ public class Security {
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
         if (!losesPriority)
-            return updateOrderWithSamePriority(order, updateOrderRq.getSide(), matcher);
-
+            return updateOrderWithSamePriorityAccepted(order, updateOrderRq.getSide(), matcher);
 
         removeFromOrderBook(updateOrderRq.getOrderId(), updateOrderRq.getSide());
         MatchResult matchResult = executeInMatcher(currentMatchingState, matcher, order);
