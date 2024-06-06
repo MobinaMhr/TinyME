@@ -215,15 +215,13 @@ public class Matcher {
 
     public MatchResult auctionExecute(Order order) {
         OrderBook orderBook = order.getSecurity().getOrderBook();
+        MatchingOutcome outcome;
 
-        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder()) + order.getQuantity();
-        if (order.getSide() == Side.SELL
-                && !order.getShareholder().hasEnoughPositionsOn(order.getSecurity(), position)) {
-            return MatchResult.notEnoughPositions();
-        }
+        outcome = controls.canStartMatching(order);
+        if (outcome != MatchingOutcome.OK) return new MatchResult(outcome, order);
 
-        if (controls.canTrade(order, null) != MatchingOutcome.OK)
-            return MatchResult.notEnoughCredit();
+        outcome = controls.canTrade(order, null);
+        if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughCredit();
 
 //        matchingAccepted add value to  input list and rename to matchingConditionsAccepted?
         if (order.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());

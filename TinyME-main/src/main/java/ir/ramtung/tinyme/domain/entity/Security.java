@@ -123,7 +123,8 @@ public class Security {
         int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
                 - order.getQuantity() + updateOrderRq.getQuantity();
         // TODO::! notEnoughPositions() : 2
-        if (updateOrderRq.getSide() == Side.SELL && !order.getShareholder().hasEnoughPositionsOn(this, position)) {
+        if (updateOrderRq.getSide() == Side.SELL
+                && !order.getShareholder().hasEnoughPositionsOn(this, position)) {
             return MatchResult.notEnoughPositions();
         }
 
