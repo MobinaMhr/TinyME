@@ -116,22 +116,31 @@ public class Security {
         return (quantityIncreased || priceChanged || peakSizeIncreased || stopPriceChanged);
     }
 
+    private MatchResult updateOrderWithSamePriority(Order order, Side orderSide, Matcher matcher) {
+        if (orderSide == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue()))
+            return MatchResult.notEnoughCredit();
+        if (orderSide == Side.BUY)
+            order.getBroker().decreaseCreditBy(order.getValue());
+
+        if (currentMatchingState == MatchingState.AUCTION) {
+            matcher.calculateReopeningPrice(orderBook);
+            return MatchResult.executed();
+        } else {
+            return MatchResult.executed(null, List.of());
+        }
+    }
+
     public MatchResult updateOrder(EnterOrderRq updateOrderRq, Matcher matcher) throws InvalidRequestException {
         Order order = findOrder(updateOrderRq.getSide(), updateOrderRq.getOrderId(),
                 Message.CANNOT_UPDATE_INACTIVE_STOP_LIMIT_ORDER_IN_AUCTION_MODE);
         validateOrder(updateOrderRq, order);
-
-        // Check enough position on
         int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
                 - order.getQuantity() + updateOrderRq.getQuantity();
-        // TODO::! notEnoughPositions() : 2
         if (updateOrderRq.getSide() == Side.SELL
                 && !order.getShareholder().hasEnoughPositionsOn(this, position)) {
             return MatchResult.notEnoughPositions();
         }
 
-
-        // TODO::! increaseCreditBy() : 2
         if (updateOrderRq.getSide() == Side.BUY) order.getBroker().increaseCreditBy(order.getValue());
 
         boolean quantityIncreased = order.isQuantityIncreased(updateOrderRq.getQuantity());
@@ -139,22 +148,7 @@ public class Security {
 
         Order originalOrder = order.snapshot();
         order.updateFromRequest(updateOrderRq);
-
-        if (!losesPriority) {
-            // TODO::! notEnoughCredit() : 2
-            if (updateOrderRq.getSide() == Side.BUY && !order.getBroker().hasEnoughCredit(order.getValue())) {
-                return MatchResult.notEnoughCredit();
-            }
-
-            // TODO::! decreaseCreditBy() : 2
-            if (updateOrderRq.getSide() == Side.BUY) order.getBroker().decreaseCreditBy(order.getValue());
-
-            if (currentMatchingState == MatchingState.AUCTION) {
-                matcher.calculateReopeningPrice(orderBook);
-                return MatchResult.executed();
-            }
-            return MatchResult.executed(null, List.of());
-        }
+        if (!losesPriority) return updateOrderWithSamePriority(order, updateOrderRq.getSide(), matcher);
 
         orderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
         inactiveOrderBook.removeByOrderId(updateOrderRq.getSide(), updateOrderRq.getOrderId());
