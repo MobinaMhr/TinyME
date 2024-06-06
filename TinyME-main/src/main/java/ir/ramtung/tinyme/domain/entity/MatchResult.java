@@ -17,6 +17,10 @@ public final class MatchResult {
         this.trades = trades;
     }
 
+    public MatchResult(MatchingOutcome outcome, Order remainder) {
+        this(outcome, remainder, new LinkedList<>());
+    }
+
     public static MatchResult executed(Order remainder, List<Trade> trades) {
         return new MatchResult(MatchingOutcome.EXECUTED,
                 remainder, new LinkedList<>(trades));
