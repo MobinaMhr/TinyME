@@ -138,13 +138,11 @@ public class Security {
         int position = orderBook.totalSellQuantityByShareholder(order.getShareholder())
                 - order.getQuantity() + updateOrderRq.getQuantity();
         if (updateOrderRq.getSide() == Side.SELL
-                && !order.getShareholder().hasEnoughPositionsOn(this, position)) {
+                && !order.getShareholder().hasEnoughPositionsOn(this, position))
             return MatchResult.notEnoughPositions();
-        }
 
         if (updateOrderRq.getSide() == Side.BUY)
             order.getBroker().increaseCreditBy(order.getValue());
-
         boolean quantityIncreased = order.isQuantityIncreased(updateOrderRq.getQuantity());
         boolean losesPriority = doesLosePriority(updateOrderRq, order, quantityIncreased);
 
@@ -153,22 +151,28 @@ public class Security {
         if (!losesPriority)
             return updateOrderWithSamePriority(order, updateOrderRq.getSide(), matcher);
 
-        removeFromOrderBook(updateOrderRq.getOrderId(), updateOrderRq.getSide());
 
+        removeFromOrderBook(updateOrderRq.getOrderId(), updateOrderRq.getSide());
         MatchResult matchResult = executeInMatcher(currentMatchingState, matcher, order);
         MatchingOutcome outcome = matchResult.outcome();
+
+        MatchResult revertResult = revertUpdateOrder(outcome, originalOrder, updateOrderRq.getSide());
+        if (revertResult == null) return matchResult;
+        return revertResult;
+    }
+
+    private MatchResult revertUpdateOrder(MatchingOutcome outcome, Order originalOrder, Side newSide) {
         if (outcome != MatchingOutcome.NOT_MET_LAST_TRADE_PRICE &&
                 outcome != MatchingOutcome.EXECUTED &&
                 outcome != MatchingOutcome.EXECUTED_IN_AUCTION) {
             orderBook.enqueue(originalOrder);
-            if (updateOrderRq.getSide() == Side.BUY
+            if (newSide == Side.BUY
                     && !originalOrder.getBroker().hasEnoughCredit(originalOrder.getValue()))
                 return MatchResult.notEnoughCredit();
-
-            if (updateOrderRq.getSide() == Side.BUY)
+            if (newSide == Side.BUY)
                 originalOrder.getBroker().decreaseCreditBy(originalOrder.getValue());
         }
-        return matchResult;
+        return null;
     }
 
     private Order getActivateCandidateOrder(int lastTradePrice) {
