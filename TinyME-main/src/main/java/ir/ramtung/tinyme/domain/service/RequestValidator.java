@@ -25,9 +25,6 @@ public class RequestValidator {
         this.brokerRepository = brokerRepository;
         this.shareholderRepository = shareholderRepository;
     }
-    // TODO -> check if this class is ok?
-    //  also check that we have 3 functions named validateRequest with different arguments. is this OK?
-    //  also we could pass repsitories to functions.
     private void validateEnterOrderAttributes(EnterOrderRq enterOrderRq, List<String> errors) {
         if (enterOrderRq.getOrderId() <= 0)
             errors.add(Message.INVALID_ORDER_ID);

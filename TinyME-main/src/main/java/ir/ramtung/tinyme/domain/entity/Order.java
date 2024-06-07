@@ -105,7 +105,6 @@ public class Order {
         }
     }
 
-    // TODO we can add initialQuantity as and attribute to this class.
     public boolean minimumExecutionQuantitySatisfied(int initialQuantity) {
         return initialQuantity - quantity >= minimumExecutionQuantity;
     }
@@ -118,14 +117,6 @@ public class Order {
         return newQuantity > quantity;
     }
 
-//    public void updateFromRequest(EnterOrderRq updateOrderRq) {
-//        if (quantity != updateOrderRq.getQuantity()) {
-//            int executedQuantity = initialQuantity - quantity;
-//            initialQuantity = updateOrderRq.getQuantity() + executedQuantity;
-//        }
-//        quantity = updateOrderRq.getQuantity();
-//        price = updateOrderRq.getPrice();
-//    }
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         quantity = updateOrderRq.getQuantity();
         price = updateOrderRq.getPrice();

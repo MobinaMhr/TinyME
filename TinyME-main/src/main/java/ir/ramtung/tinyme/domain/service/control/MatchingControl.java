@@ -1,4 +1,4 @@
-package ir.ramtung.tinyme.domain.service;
+package ir.ramtung.tinyme.domain.service.control;
 
 import ir.ramtung.tinyme.domain.entity.MatchResult;
 import ir.ramtung.tinyme.domain.entity.MatchingOutcome;

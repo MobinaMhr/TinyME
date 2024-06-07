@@ -41,7 +41,6 @@ public class OrderHandler {
         this.requestValidator = new RequestValidator(securityRepository, brokerRepository, shareholderRepository);
     }
 
-
     private void executeActivatedSLO(Security security, MatchingState targetState){
         ArrayList<MatchResult> results = security.activateStopLimitOrder(matcher, targetState);
         for (MatchResult result: results){
@@ -60,13 +59,13 @@ public class OrderHandler {
                         result.remainder().getOrderId(), result);
         }
     }
+
     private boolean shouldInactiveOrdersActivate(MatchResult matchResult) {
         if (matchResult != null && matchResult.outcome() == MatchingOutcome.EXECUTED ||
                 matchResult.outcome() == MatchingOutcome.EXECUTED_IN_AUCTION)
             return true;
         return false;
     }
-
 
     public void publishEnterOrderRq(EnterOrderRq enterOrderRq, MatchResult matchResult,
                                    boolean isTypeStopLimitOrder, Security security) {
@@ -102,6 +101,7 @@ public class OrderHandler {
         if (!matchResult.trades().isEmpty())
             eventPublisher.publishIfTradeExists(enterOrderRq.getRequestId(), enterOrderRq.getOrderId(), matchResult);
     }
+
     public void handleEnterOrder(EnterOrderRq enterOrderRq) {
         try {
             requestValidator.validateRequest(enterOrderRq);
@@ -145,12 +145,6 @@ public class OrderHandler {
             MatchResult result = security.updateMatchingState(changeMatchingStateRq.getTargetState(), matcher);
 
             publishChangeMatchingStateRq(changeMatchingStateRq, result, security);
-            //            eventPublisher.publishSecurityStateChangedEvent(changeMatchingStateRq);
-//
-//            // Shall we change ? TODO
-//            if (result == null || result.trades() == null) return;
-//            for (Trade trade : result.trades())
-//                eventPublisher.publishTradeEvents(trade, security.getIsin());
 
             // TODO Should we move this if before previous if?
             if(oldMatchingState == MatchingState.AUCTION) {
@@ -169,6 +163,7 @@ public class OrderHandler {
             eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
         }
     }
+
     public void handleDeleteOrder(DeleteOrderRq deleteOrderRq) {
         try {
             requestValidator.validateRequest(deleteOrderRq);
@@ -177,12 +172,6 @@ public class OrderHandler {
             security.deleteOrder(deleteOrderRq, matcher);
 
             publishDeleteOrderRq(deleteOrderRq, security);
-//            eventPublisher.publishOrderDeletedEvent(deleteOrderRq);
-//            orderIdRqIdMap.remove(deleteOrderRq.getOrderId());
-//
-//            if (security.getCurrentMatchingState() == MatchingState.AUCTION) {
-//                eventPublisher.publishOpeningPriceEvent(security.getIsin(), matcher.getReopeningPrice(), matcher.maxTradableQuantity);
-//            }
         } catch (InvalidRequestException e) {
             eventPublisher.publishOrderRejectedEvent(deleteOrderRq, e.getReasons());
         }
