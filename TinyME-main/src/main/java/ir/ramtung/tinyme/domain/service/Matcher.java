@@ -2,6 +2,7 @@ package ir.ramtung.tinyme.domain.service;
 
 import ir.ramtung.tinyme.domain.entity.*;
 import ir.ramtung.tinyme.domain.service.control.MatchingControlList;
+import ir.ramtung.tinyme.messaging.request.MatchingState;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +59,7 @@ public class Matcher {
 
             trades.add(trade);
             controls.tradeAccepted(newOrder, trade);
-            controls.tradeQuantityUpdated(newOrder, matchingOrder, trade);
+            controls.tradeQuantityUpdated(newOrder, matchingOrder, MatchingState.CONTINUOUS);
         }
         return MatchResult.executed(newOrder, trades);
     }
@@ -141,19 +142,10 @@ public class Matcher {
 
             buyOrder.getBroker().increaseCreditBy(buyOrder.getValue());
             controls.tradeAccepted(buyOrder, trade);
-            controls.matchingAccepted(buyOrder, MatchResult.executed(List.of(trade))); //TODO in dorost mikone benazaram share haro
+            controls.matchingAccepted(buyOrder, MatchResult.executed(List.of(trade)));
             trades.add(trade);
 
-//            controls.tradeQuantityUpdated(buyOrder, sellOrder, trade);
-
-            int tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
-            // TODO in bayad tradeQuantityUpdated ro baraye halate auction ham besazim
-            buyOrder.decreaseQuantity(tradedQuantity);
-            sellOrder.decreaseQuantity(tradedQuantity);
-
-            removeOrdersWithZeroQuantity(buyOrder, Side.BUY, orderBook);
-            removeOrdersWithZeroQuantity(sellOrder, Side.SELL, orderBook);
-
+            controls.tradeQuantityUpdated(buyOrder, sellOrder, MatchingState.AUCTION);
             buyOrder.getBroker().decreaseCreditBy(buyOrder.getValue());
         }
         return trades;

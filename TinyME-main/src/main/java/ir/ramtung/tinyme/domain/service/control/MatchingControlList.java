@@ -5,6 +5,7 @@ import ir.ramtung.tinyme.domain.entity.MatchingOutcome;
 import ir.ramtung.tinyme.domain.entity.Order;
 import ir.ramtung.tinyme.domain.entity.Trade;
 import ir.ramtung.tinyme.domain.service.control.MatchingControl;
+import ir.ramtung.tinyme.messaging.request.MatchingState;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -65,9 +66,9 @@ public class MatchingControlList {
             control.tradeAccepted(newOrder, trade);
         }
     }
-    public void tradeQuantityUpdated(Order newOrder, Order matchingOrder, Trade trade) {
+    public void tradeQuantityUpdated(Order newOrder, Order matchingOrder, MatchingState mode) {
         for (MatchingControl control : controlList) {
-            control.tradeQuantityUpdated(newOrder, matchingOrder, trade);
+            control.tradeQuantityUpdated(newOrder, matchingOrder, mode);
         }
     }
     public void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {
