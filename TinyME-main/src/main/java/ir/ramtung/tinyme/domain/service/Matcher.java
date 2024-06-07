@@ -144,6 +144,8 @@ public class Matcher {
             controls.matchingAccepted(buyOrder, MatchResult.executed(List.of(trade))); //TODO in dorost mikone benazaram share haro
             trades.add(trade);
 
+//            controls.tradeQuantityUpdated(buyOrder, sellOrder, trade);
+
             int tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
             // TODO in bayad tradeQuantityUpdated ro baraye halate auction ham besazim
             buyOrder.decreaseQuantity(tradedQuantity);
