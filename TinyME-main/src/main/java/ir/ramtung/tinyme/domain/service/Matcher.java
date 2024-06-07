@@ -51,7 +51,7 @@ public class Matcher {
             Order matchingOrder = orderBook.matchWithFirst(newOrder);
             if (matchingOrder == null) break;
             Trade trade = createNewTradeFor(newOrder, matchingOrder.getPrice(), matchingOrder);
-
+            System.out.println(controls);
             if (controls.canTrade(newOrder, trade) != MatchingOutcome.OK) {
                 controls.rollbackTrades(newOrder, trades);
                 return MatchResult.notEnoughCredit();
@@ -114,18 +114,6 @@ public class Matcher {
 
         if (maxQuantityWithLastPrice == this.maxTradableQuantity) this.reopeningPrice = lastTradePrice;
         if (maxTradableQuantity == 0) this.reopeningPrice = 0;
-    }
-
-    private void removeOrdersWithZeroQuantity(Order order, Side side, OrderBook orderBook) {
-        if (order.getQuantity() != 0) return;
-        orderBook.removeByOrderId(side, order.getOrderId());
-
-        if (order instanceof IcebergOrder iOrder){
-            iOrder.replenish();
-            if (iOrder.getQuantity() > 0){
-                orderBook.enqueue(iOrder);
-            }
-        }
     }
 
     public LinkedList<Trade> auctionMatch(OrderBook orderBook) {

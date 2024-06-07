@@ -48,6 +48,8 @@ public class OrderHandlerTest {
     BrokerRepository brokerRepository;
     @Autowired
     ShareholderRepository shareholderRepository;
+    @Autowired
+    private Matcher matcher;
     private Security security;
     private Shareholder shareholder;
     private Broker broker1;
@@ -135,7 +137,7 @@ public class OrderHandlerTest {
                 matchingBuyOrder, incomingSellOrder);
 
         EventPublisher mockEventPublisher = mock(EventPublisher.class, withSettings().verboseLogging());
-        OrderHandler myOrderHandler = new OrderHandler(securityRepository, brokerRepository, shareholderRepository, mockEventPublisher, new Matcher());
+        OrderHandler myOrderHandler = new OrderHandler(securityRepository, brokerRepository, shareholderRepository, mockEventPublisher, matcher);
         EnterOrderRq enterOrderRq = EnterOrderRq.createNewOrderRq(1,
                 incomingSellOrder.getSecurity().getIsin(),
                 incomingSellOrder.getOrderId(),
