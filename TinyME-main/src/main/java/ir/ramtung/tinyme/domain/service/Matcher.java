@@ -24,6 +24,7 @@ public class Matcher {
         return new Trade(order.getSecurity(), price, Math.min(order.getQuantity(),
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
+
     private MatchResult canStartMatchingStopLimitOrder(StopLimitOrder newSLOrder) {
         InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
         if (controls.canTrade(newSLOrder, null) != MatchingOutcome.OK) {
@@ -35,6 +36,7 @@ public class Matcher {
         }
         return null;
     }
+
     public MatchResult match(Order newOrder) {
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
 
@@ -143,7 +145,7 @@ public class Matcher {
             trades.add(trade);
 
             int tradedQuantity = Math.min(buyOrder.getQuantity(), sellOrder.getQuantity());
-            //TODO in bayad tradeQuantityUpdated ro baraye halate auction ham besazim
+            // TODO in bayad tradeQuantityUpdated ro baraye halate auction ham besazim
             buyOrder.decreaseQuantity(tradedQuantity);
             sellOrder.decreaseQuantity(tradedQuantity);
 
@@ -174,8 +176,7 @@ public class Matcher {
             return result;
         }
 
-        if (order.getStatus() == OrderStatus.NEW &&
-                !result.remainder().minimumExecutionQuantitySatisfied(prevQuantity)) {
+        if (controls.doesMetMEQValue(order, result, prevQuantity)!= MatchingOutcome.OK) {
             controls.rollbackTrades(order, result.trades());
             return MatchResult.notMetMEQValue();
         }

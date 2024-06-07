@@ -20,4 +20,7 @@ public interface MatchingControl {
     default void tradeQuantityUpdated(Order newOrder, Order matchingOrder , Trade trade) {}
 
     default void rollbackTrades(Order newOrder, LinkedList<Trade> trades) {}
+
+    default MatchingOutcome doesMetMEQValue(Order order, MatchResult result, int prevQuantity) { return MatchingOutcome.OK; }
+
 }
