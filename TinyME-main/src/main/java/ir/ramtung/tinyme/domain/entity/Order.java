@@ -25,10 +25,12 @@ public class Order {
     @Builder.Default
     protected OrderStatus status = OrderStatus.NEW;
     protected int minimumExecutionQuantity;
+    protected int initialQuantity;
+
 
     public Order(long orderId, Security security, Side side, int quantity, int price,
                  Broker broker, Shareholder shareholder, LocalDateTime entryTime,
-                 OrderStatus status, int minimumExecutionQuantity) {
+                 OrderStatus status, int minimumExecutionQuantity, int initialQuantity) {
         this.orderId = orderId;
         this.security = security;
         this.side = side;
@@ -39,6 +41,15 @@ public class Order {
         this.shareholder = shareholder;
         this.status = status;
         this.minimumExecutionQuantity = minimumExecutionQuantity;
+        this.initialQuantity = initialQuantity;
+    }
+
+    public Order(long orderId, Security security, Side side, int quantity, int price,
+                 Broker broker, Shareholder shareholder, LocalDateTime entryTime,
+                 OrderStatus status, int minimumExecutionQuantity) {
+        this(orderId, security, side, quantity, price,
+                broker, shareholder, entryTime, status, minimumExecutionQuantity, quantity);
+
     }
     public Order(long orderId, Security security, Side side, int quantity, int price,
                  Broker broker, Shareholder shareholder, LocalDateTime entryTime,
@@ -77,7 +88,13 @@ public class Order {
     public Order snapshotWithQuantity(int newQuantity) {
         return new Order(orderId, security, side, newQuantity,
                 price, broker, shareholder, entryTime,
-                OrderStatus.SNAPSHOT, minimumExecutionQuantity);
+                OrderStatus.SNAPSHOT, minimumExecutionQuantity, initialQuantity);
+    }
+
+    public boolean minimumExecutionQuantitySatisfied() {
+        if (initialQuantity - quantity < minimumExecutionQuantity)
+            return false;
+        return true;
     }
 
     public boolean matches(Order other) {
@@ -118,6 +135,10 @@ public class Order {
     }
 
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
+        if (quantity != updateOrderRq.getQuantity()) {
+            int executedQuantity = initialQuantity - quantity;
+            initialQuantity = updateOrderRq.getQuantity() + executedQuantity;
+        }
         quantity = updateOrderRq.getQuantity();
         price = updateOrderRq.getPrice();
     }

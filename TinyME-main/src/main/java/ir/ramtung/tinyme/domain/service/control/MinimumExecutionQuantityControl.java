@@ -9,10 +9,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class MinimumExecutionQuantityControl implements MatchingControl {
-    public MatchingOutcome doesMetMEQValue(Order order, MatchResult result, int prevQuantity) {
-        if (order.getStatus() == OrderStatus.NEW &&
-                !result.remainder().minimumExecutionQuantitySatisfied(prevQuantity))
-            return MatchingOutcome.NOT_MET_MEQ_VALUE;
-        else return MatchingOutcome.OK;
+    public MatchingOutcome canAcceptMatching(Order order, MatchResult result) {
+        if (order.minimumExecutionQuantitySatisfied())
+            return MatchingOutcome.OK;
+        else return MatchingOutcome.NOT_MET_MEQ_VALUE;
     }
 }
+
+
+

@@ -77,14 +77,5 @@ public class MatchingControlList {
         }
 
     }
-    public MatchingOutcome doesMetMEQValue(Order order, MatchResult result, int prevQuantity) {
-        for (MatchingControl control : controlList) {
-            MatchingOutcome outcome = control.doesMetMEQValue(order, result, prevQuantity);
-            if (outcome != MatchingOutcome.OK) {
-                return outcome;
-            }
-        }
-        return MatchingOutcome.OK;
-    }
 
 }

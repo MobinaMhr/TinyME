@@ -149,7 +149,6 @@ public class Matcher {
         outcome = controls.canStartMatching(order);
         if (outcome != MatchingOutcome.OK) return new MatchResult(outcome, null);
 
-        int prevQuantity = order.getQuantity();
 
         MatchResult result = match(order);
         outcome = result.outcome();
@@ -157,12 +156,6 @@ public class Matcher {
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             controls.orderAccepted(order);
             return result;
-        }
-
-        outcome = controls.doesMetMEQValue(order, result, prevQuantity);
-        if (outcome != MatchingOutcome.OK) {
-            controls.rollbackTrades(order, result.trades());
-            return new MatchResult(outcome, null);
         }
 
         outcome = controls.canAcceptMatching(order, result);

@@ -16,6 +16,15 @@ public class IcebergOrder extends Order {
 
     public IcebergOrder(long orderId, Security security, Side side, int quantity,
                         int price, Broker broker, Shareholder shareholder, LocalDateTime entryTime,
+                        int peakSize, int displayedQuantity, OrderStatus status, int minimumExecutionQuantity, int initialQuantity) {
+        super(orderId, security, side, quantity, price, broker, shareholder, entryTime, status,
+                minimumExecutionQuantity, initialQuantity);
+        this.peakSize = peakSize;
+        this.displayedQuantity = displayedQuantity;
+    }
+
+    public IcebergOrder(long orderId, Security security, Side side, int quantity,
+                        int price, Broker broker, Shareholder shareholder, LocalDateTime entryTime,
                         int peakSize, int displayedQuantity, OrderStatus status, int minimumExecutionQuantity) {
         super(orderId, security, side, quantity, price, broker, shareholder, entryTime, status,
                 minimumExecutionQuantity);
@@ -47,8 +56,15 @@ public class IcebergOrder extends Order {
         return new IcebergOrder(orderId, security,
                 side, newQuantity, price, broker,
                 shareholder, entryTime, peakSize,
+                Math.min(peakSize, quantity),
                 OrderStatus.SNAPSHOT,
-                minimumExecutionQuantity);
+                minimumExecutionQuantity,
+                initialQuantity);
+    }
+    @Override
+    public boolean minimumExecutionQuantitySatisfied() {
+        displayedQuantity = Math.min(quantity, peakSize);
+        return super.minimumExecutionQuantitySatisfied();
     }
 
     @Override
