@@ -100,13 +100,6 @@ public class Matcher {
         if (newOrder instanceof StopLimitOrder sloOrder) {
             MatchResult result = canMatchSLO(sloOrder);
             if (result != null) return result;
-//            outcome = controls.canTrade(sloOrder, null);
-//            if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughCredit();
-//            InactiveOrderBook inactiveOrderBook = sloOrder.getSecurity().getInactiveOrderBook();
-//            if (!sloOrder.canMeetLastTradePrice(lastTradePrice)) {
-//                inactiveOrderBook.DeActive(newOrder);
-//                return MatchResult.notMetLastTradePrice();
-//            }
         }
 
         OrderBook orderBook = newOrder.getSecurity().getOrderBook();
@@ -172,11 +165,11 @@ public class Matcher {
             return new MatchResult(outcome, null);
         }
 
-//        outcome = controls.canAcceptMatching(order, result);
-//        if (outcome != MatchingOutcome.OK) {
-//            controls.rollbackTrades(order, result.trades());
-//            return new MatchResult(outcome, null);
-//        }
+        outcome = controls.canAcceptMatching(order, result);
+        if (outcome != MatchingOutcome.OK) {
+            controls.rollbackTrades(order, result.trades());
+            return new MatchResult(outcome, null);
+        }
 
         if (result.remainder().getQuantity() > 0) order.getSecurity().getOrderBook().enqueue(result.remainder());
 

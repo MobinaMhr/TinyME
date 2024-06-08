@@ -25,11 +25,11 @@ public class MatchingControlList {
         }
         return MatchingOutcome.OK;
     }
-    public void matchingStarted(Order order) {
-        for (MatchingControl control : controlList) {
-            control.matchingStarted(order);
-        }
-    }
+//    public void matchingStarted(Order order) {
+//        for (MatchingControl control : controlList) {
+//            control.matchingStarted(order);
+//        }
+//    }
     public MatchingOutcome canAcceptMatching(Order order, MatchResult result) {
         for (MatchingControl control : controlList) {
             MatchingOutcome outcome = control.canAcceptMatching(order, result);
