@@ -26,44 +26,6 @@ public class Matcher {
                 matchingOrder.getQuantity()), order, matchingOrder);
     }
 
-    private MatchResult canStartMatchingStopLimitOrder(StopLimitOrder newSLOrder) {
-        InactiveOrderBook inactiveOrderBook = newSLOrder.getSecurity().getInactiveOrderBook();
-        if (controls.canTrade(newSLOrder, null) != MatchingOutcome.OK) {
-            return MatchResult.notEnoughCredit();
-        }
-        if (!newSLOrder.canMeetLastTradePrice(lastTradePrice)) {
-            inactiveOrderBook.DeActive((Order) newSLOrder);
-            return MatchResult.notMetLastTradePrice();
-        }
-        return null;
-    }
-
-    public MatchResult match(Order newOrder) {
-        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
-
-        if (newOrder instanceof StopLimitOrder stopLimitOrder) {
-            MatchResult sloResult = canStartMatchingStopLimitOrder(stopLimitOrder);
-            if (sloResult != null) return sloResult;
-        }
-
-        LinkedList<Trade> trades = new LinkedList<>();
-        while (orderBook.hasOrderOfType(newOrder.getSide().opposite()) && newOrder.getQuantity() > 0) {
-            Order matchingOrder = orderBook.matchWithFirst(newOrder);
-            if (matchingOrder == null) break;
-            Trade trade = createNewTradeFor(newOrder, matchingOrder.getPrice(), matchingOrder);
-            System.out.println(controls);
-            if (controls.canTrade(newOrder, trade) != MatchingOutcome.OK) {
-                controls.rollbackTrades(newOrder, trades);
-                return MatchResult.notEnoughCredit();
-            }
-
-            trades.add(trade);
-            controls.tradeAccepted(newOrder, trade);
-            controls.tradeQuantityUpdated(newOrder, matchingOrder, MatchingState.CONTINUOUS);
-        }
-        return MatchResult.executed(newOrder, trades);
-    }
-
     private int getTradableQuantity(int orgPrice, LinkedList<Order> oppQueue, Side orgSide) {
         int tradableQuantityOpp = 0;
         for(Order order:oppQueue) {
@@ -116,6 +78,49 @@ public class Matcher {
         if (maxTradableQuantity == 0) this.reopeningPrice = 0;
     }
 
+    private MatchResult canMatchSLO(StopLimitOrder sloOrder) {
+        MatchingOutcome outcome;
+        outcome = controls.canTrade(sloOrder, null);
+        if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughCredit();
+        InactiveOrderBook inactiveOrderBook = sloOrder.getSecurity().getInactiveOrderBook();
+        if (!sloOrder.canMeetLastTradePrice(lastTradePrice)) {
+            inactiveOrderBook.DeActive((Order) sloOrder);
+            return MatchResult.notMetLastTradePrice();
+        }
+        return null;
+    }
+    public MatchResult match(Order newOrder) {
+        MatchingOutcome outcome;
+        if (newOrder instanceof StopLimitOrder sloOrder) {
+            MatchResult result = canMatchSLO(sloOrder);
+            if (result != null) return result;
+//            outcome = controls.canTrade(sloOrder, null);
+//            if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughCredit();
+//            InactiveOrderBook inactiveOrderBook = sloOrder.getSecurity().getInactiveOrderBook();
+//            if (!sloOrder.canMeetLastTradePrice(lastTradePrice)) {
+//                inactiveOrderBook.DeActive(newOrder);
+//                return MatchResult.notMetLastTradePrice();
+//            }
+        }
+
+        OrderBook orderBook = newOrder.getSecurity().getOrderBook();
+        LinkedList<Trade> trades = new LinkedList<>();
+        while (orderBook.hasOrderOfType(newOrder.getSide().opposite()) && newOrder.getQuantity() > 0) {
+            Order matchingOrder = orderBook.matchWithFirst(newOrder);
+            if (matchingOrder == null) break;
+            Trade trade = createNewTradeFor(newOrder, matchingOrder.getPrice(), matchingOrder);
+            outcome = controls.canTrade(newOrder, trade);
+            if (outcome != MatchingOutcome.OK) {
+                controls.rollbackTrades(newOrder, trades);
+                return MatchResult.notEnoughCredit();
+            }
+            trades.add(trade);
+            controls.tradeAccepted(newOrder, trade);
+            controls.tradeQuantityUpdated(newOrder, matchingOrder, MatchingState.CONTINUOUS);
+        }
+        return MatchResult.executed(newOrder, trades);
+    }
+
     public LinkedList<Trade> auctionMatch(OrderBook orderBook) {
         LinkedList<Trade> trades = new LinkedList<>();
         while (true) {
@@ -140,35 +145,35 @@ public class Matcher {
     }
 
     public MatchResult execute(Order order) {
-        OrderBook orderBook = order.getSecurity().getOrderBook();
+        MatchingOutcome outcome;
 
-        int position = orderBook.totalSellQuantityByShareholder(order.getShareholder()) + order.getQuantity();
-        if (order.getSide() == Side.SELL
-                && !order.getShareholder().hasEnoughPositionsOn(order.getSecurity(), position)) {
-            return MatchResult.notEnoughPositions();
-        }
+        outcome = controls.canStartMatching(order);
+        if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughPositions();
 
         int prevQuantity = order.getQuantity();
 
         MatchResult result = match(order);
-        if (result.outcome() == MatchingOutcome.NOT_ENOUGH_CREDIT) return result;
-
+        outcome = result.outcome();
+        if (outcome == MatchingOutcome.NOT_ENOUGH_CREDIT) return result;
         if (result.outcome() == MatchingOutcome.NOT_MET_LAST_TRADE_PRICE) {
             controls.orderAccepted(order);
             return result;
         }
-
-        if (controls.doesMetMEQValue(order, result, prevQuantity)!= MatchingOutcome.OK) {
+        
+        outcome = controls.doesMetMEQValue(order, result, prevQuantity);
+        if (outcome != MatchingOutcome.OK) {
             controls.rollbackTrades(order, result.trades());
-            return MatchResult.notMetMEQValue();
+            return new MatchResult(outcome, null);
         }
 
-        if(controls.canAcceptMatching(order, result) != MatchingOutcome.OK){
+        outcome = controls.canAcceptMatching(order, result);
+        if (outcome != MatchingOutcome.OK) {
             controls.rollbackTrades(order, result.trades());
-            return MatchResult.notEnoughCredit();
+            return new MatchResult(outcome, null);
         }
 
         if (result.remainder().getQuantity() > 0) order.getSecurity().getOrderBook().enqueue(result.remainder());
+
         controls.orderAccepted(order);
         controls.matchingAccepted(order, result);
         if (!result.trades().isEmpty()) lastTradePrice = result.trades().getLast().getPrice();
