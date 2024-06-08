@@ -28,8 +28,6 @@ public class Security {
     @Builder.Default
     private MatchingState currentMatchingState = MatchingState.CONTINUOUS;
 
-    //TODO -> change flow of updateOrder if requiered time become available
-
     private Order createNewOrderInstance(EnterOrderRq enterOrderRq, Broker broker, Shareholder shareholder) {
         if (enterOrderRq.getPeakSize() == 0 && enterOrderRq.getStopPrice() == 0) {
             return new Order(enterOrderRq.getOrderId(), this, enterOrderRq.getSide(),

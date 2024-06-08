@@ -131,7 +131,6 @@ public class OrderHandler {
     private void publishChangeMatchingStateRq(ChangeMatchingStateRq changeMatchingStateRq, MatchResult result, Security security) {
         eventPublisher.publishSecurityStateChangedEvent(changeMatchingStateRq);
 
-        // Shall we change ? TODO
         if (result == null || result.trades() == null) return;
         for (Trade trade : result.trades())
             eventPublisher.publishTradeEvents(trade, security.getIsin());
@@ -146,10 +145,8 @@ public class OrderHandler {
 
             publishChangeMatchingStateRq(changeMatchingStateRq, result, security);
 
-            // TODO Should we move this if before previous if?
-            if(oldMatchingState == MatchingState.AUCTION) {
+            if(oldMatchingState == MatchingState.AUCTION)
                 executeActivatedSLO(security, changeMatchingStateRq.getTargetState());
-            }
         } catch (InvalidRequestException e) {
             eventPublisher.publishChangeMatchingStateRqRejectedEvent(changeMatchingStateRq);
         }

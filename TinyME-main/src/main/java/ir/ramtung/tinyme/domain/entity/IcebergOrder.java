@@ -75,26 +75,12 @@ public class IcebergOrder extends Order {
     public void replenish() {
         displayedQuantity = Math.min(quantity, peakSize);
     }
-    //TODO -> resolve comments of this file sooner.
-
-
-    // Why we don't have this
-    //    @Override
-//    public boolean minimumExecutionQuantitySatisfied() {
-//        displayedQuantity = Math.min(quantity, peakSize);
-//        return super.minimumExecutionQuantitySatisfied();
-//    }
-
     @Override
     public void updateFromRequest(EnterOrderRq updateOrderRq) {
         super.updateFromRequest(updateOrderRq);
         if (peakSize < updateOrderRq.getPeakSize()) {
             displayedQuantity = Math.min(quantity, updateOrderRq.getPeakSize());
         }
-        // Why we don't have this
-//        else if (peakSize > updateOrderRq.getPeakSize()) {
-//            displayedQuantity = Math.min(displayedQuantity, updateOrderRq.getPeakSize());
-//        }
         peakSize = updateOrderRq.getPeakSize();
     }
 }

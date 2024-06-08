@@ -36,28 +36,34 @@ public class Matcher {
         return tradableQuantityOpp;
     }
 
+    private int getLastTradeReopeningPriceDiff() {
+        return Math.abs(lastTradePrice - this.reopeningPrice);
+    }
+    private int getLastTradeOrderPriceDiff(int orderPrice) {
+        return Math.abs(lastTradePrice - orderPrice);
+    }
+    private int getTradableQuantityForPrice(int orderPrice, Side side, OrderBook orderBook) {
+        return  (side == Side.SELL) ?
+                getTradableQuantity(orderPrice, orderBook.getBuyQueue(), side) :
+                getTradableQuantity(orderPrice, orderBook.getSellQueue(), side);
+    }
     private void calculateBestReopeningPriceInQueue(LinkedList<Order> queue, OrderBook orderBook, Side side) {
-        //TODO:rename to getter function and set the return type as in
         int tradableQuantity = 0;
-        int tradableQuantityOpp;
-
         for(Order order: queue) {
             tradableQuantity += order.getTotalQuantity();
-
-            tradableQuantityOpp = (side == Side.SELL) ?
-                    getTradableQuantity(order.getPrice(), orderBook.getBuyQueue(), side) :
-                    getTradableQuantity(order.getPrice(), orderBook.getSellQueue(), side);
-
+            int tradableQuantityOpp = getTradableQuantityForPrice(order.getPrice(), side, orderBook);
             int exchangedQuantity = Math.min(tradableQuantityOpp, tradableQuantity);
-            if(exchangedQuantity > this.maxTradableQuantity){
+
+            if (exchangedQuantity < this.maxTradableQuantity) continue;
+            if (exchangedQuantity > this.maxTradableQuantity) {
                 this.reopeningPrice = order.getPrice();
                 this.maxTradableQuantity = exchangedQuantity;
             }
-            else if (exchangedQuantity == this.maxTradableQuantity){
-                if(Math.abs(lastTradePrice - this.reopeningPrice) > Math.abs(lastTradePrice - order.getPrice())) {
+            else {
+                if (getLastTradeReopeningPriceDiff() > getLastTradeOrderPriceDiff(order.getPrice())) {
                     this.reopeningPrice = order.getPrice();
                 }
-                else if (Math.abs(lastTradePrice - this.reopeningPrice) == Math.abs(lastTradePrice - order.getPrice())) {
+                else if (getLastTradeReopeningPriceDiff() == getLastTradeOrderPriceDiff(order.getPrice())) {
                     this.reopeningPrice = Math.min(this.reopeningPrice, order.getPrice());
                 }
             }
@@ -148,7 +154,7 @@ public class Matcher {
         MatchingOutcome outcome;
 
         outcome = controls.canStartMatching(order);
-        if (outcome != MatchingOutcome.OK) return MatchResult.notEnoughPositions();
+        if (outcome != MatchingOutcome.OK) return new MatchResult(outcome, null);
 
         int prevQuantity = order.getQuantity();
 
@@ -159,18 +165,18 @@ public class Matcher {
             controls.orderAccepted(order);
             return result;
         }
-        
+
         outcome = controls.doesMetMEQValue(order, result, prevQuantity);
         if (outcome != MatchingOutcome.OK) {
             controls.rollbackTrades(order, result.trades());
             return new MatchResult(outcome, null);
         }
 
-        outcome = controls.canAcceptMatching(order, result);
-        if (outcome != MatchingOutcome.OK) {
-            controls.rollbackTrades(order, result.trades());
-            return new MatchResult(outcome, null);
-        }
+//        outcome = controls.canAcceptMatching(order, result);
+//        if (outcome != MatchingOutcome.OK) {
+//            controls.rollbackTrades(order, result.trades());
+//            return new MatchResult(outcome, null);
+//        }
 
         if (result.remainder().getQuantity() > 0) order.getSecurity().getOrderBook().enqueue(result.remainder());
 
